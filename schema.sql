@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS users (
     telegram_id BIGINT UNIQUE NOT NULL,
     username VARCHAR(255),
     nex_trade_balance NUMERIC(20, 4) NOT NULL DEFAULT 100.0000,  -- boshlang'ich 100 ta Nex Trade
+    referred_by INTEGER REFERENCES users(id),  -- kim taklif qilgani (referal)
     created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 

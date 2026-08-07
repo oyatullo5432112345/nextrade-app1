@@ -51,8 +51,8 @@
     display:flex; gap:6px; padding:4px 18px 14px;
   }
   nav.tabs button{
-    flex:1; padding:10px 0; border:none; border-radius:12px;
-    background:transparent; color:var(--muted); font-weight:600; font-size:13px;
+    flex:1; padding:10px 4px; border:none; border-radius:12px;
+    background:transparent; color:var(--muted); font-weight:600; font-size:12.5px;
     font-family:'Inter',sans-serif;
   }
   nav.tabs button.active{
@@ -160,6 +160,42 @@
     font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted);
     font-weight:700; margin:4px 0 10px;
   }
+  .search-box{
+    width:100%; background:var(--card); border:1px solid var(--border);
+    border-radius:12px; padding:11px 14px; color:var(--text); font-size:14px;
+    font-family:'Inter',sans-serif; margin-bottom:14px;
+  }
+  .search-box:focus{ outline:none; border-color:var(--gold); }
+
+  /* Profil */
+  .profile-header{
+    display:flex; flex-direction:column; align-items:center; text-align:center;
+    padding:20px 0 24px;
+  }
+  .profile-avatar{
+    width:64px; height:64px; border-radius:20px;
+    background:linear-gradient(135deg, var(--gold), #FF8A5C);
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:24px; color:#1A1200;
+    margin-bottom:10px;
+  }
+  .profile-stats{
+    display:flex; gap:10px; width:100%; margin-top:16px;
+  }
+  .stat-card{
+    flex:1; background:var(--card); border:1px solid var(--border);
+    border-radius:14px; padding:14px; text-align:center;
+  }
+  .stat-num{ font-family:'Space Grotesk',sans-serif; font-size:20px; font-weight:700; color:var(--gold); }
+  .stat-label{ font-size:11px; color:var(--muted); margin-top:2px; }
+  .referral-box{
+    background:var(--card); border:1px solid var(--border); border-radius:14px;
+    padding:14px; margin-top:16px; width:100%;
+  }
+  .referral-link{
+    background:var(--bg-elevated); border:1px solid var(--border); border-radius:10px;
+    padding:10px 12px; font-size:12px; color:var(--muted); word-break:break-all; margin-top:8px;
+  }
 
   /* Token tafsilot ekrani */
   .detail-overlay{
@@ -214,13 +250,15 @@
   <button class="tab-btn active" data-tab="market">Bozor</button>
   <button class="tab-btn" data-tab="portfolio">Portfelim</button>
   <button class="tab-btn" data-tab="create">Yaratish</button>
+  <button class="tab-btn" data-tab="profile">Profil</button>
 </nav>
 
 <main>
   <section class="screen active" id="screen-market">
-    <div class="section-title">Top tokenlar</div>
+    <input class="search-box" id="search-input" type="text" placeholder="🔍 Token nomi yoki belgisi bo'yicha qidirish" />
+    <div class="section-title" id="leaderboard-title">Top tokenlar</div>
     <div class="leaderboard" id="leaderboard"></div>
-    <div class="section-title">Barcha tokenlar</div>
+    <div class="section-title" id="market-list-title">Barcha tokenlar</div>
     <div id="market-list"></div>
   </section>
 
@@ -245,6 +283,34 @@
       </div>
       <button class="primary" id="create-btn">Token yaratish</button>
     </div>
+  </section>
+
+  <section class="screen" id="screen-profile">
+    <div class="profile-header">
+      <div class="profile-avatar" id="profile-avatar">?</div>
+      <div id="profile-username" style="font-weight:700;font-size:16px;">—</div>
+      <div class="profile-stats">
+        <div class="stat-card">
+          <div class="stat-num" id="stat-balance">0</div>
+          <div class="stat-label">Nex Trade</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num" id="stat-tokens">0</div>
+          <div class="stat-label">Yaratilgan token</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num" id="stat-referrals">0</div>
+          <div class="stat-label">Taklif qilingan</div>
+        </div>
+      </div>
+      <div class="referral-box">
+        <div style="font-weight:600;font-size:13.5px;">👥 Do'stlarni taklif qiling</div>
+        <div class="hint">Har bir yangi do'stingiz uchun ikkalangizga ham bonus Nex Trade beriladi.</div>
+        <div class="referral-link" id="referral-link">—</div>
+      </div>
+    </div>
+    <div class="section-title">Mening tokenlarim</div>
+    <div id="my-tokens-list"></div>
   </section>
 </main>
 
@@ -292,6 +358,7 @@
   // ====== SOZLAMALAR ======
   // Backend serveringiz ishga tushgach, shu manzilni o'zgartiring:
   const API_BASE = "https://YOUR-SERVER-URL.com/api";
+  const BOT_USERNAME = "your_bot_username"; // @siz - referal havolasi uchun
 
   const tg = window.Telegram?.WebApp;
   tg?.ready();
@@ -320,6 +387,7 @@
       btn.classList.add("active");
       document.getElementById("screen-"+btn.dataset.tab).classList.add("active");
       if(btn.dataset.tab === "portfolio") loadPortfolio();
+      if(btn.dataset.tab === "profile") loadProfile();
     });
   });
 
@@ -337,9 +405,18 @@
     const tgUser = tg?.initDataUnsafe?.user;
     const telegramId = tgUser?.id || 000000; // brauzerda sinash uchun zaxira ID
     const username = tgUser?.username || "sinov";
+
+    // Agar Mini App referal havolasi orqali (start_param) ochilgan bo'lsa
+    const startParam = tg?.initDataUnsafe?.start_param;
+    let referrerTelegramId;
+    if (startParam && startParam.startsWith("ref_")) {
+      const parsed = Number(startParam.replace("ref_", ""));
+      if (!isNaN(parsed)) referrerTelegramId = parsed;
+    }
+
     currentUser = await api("/user/init", {
       method:"POST",
-      body: JSON.stringify({ telegram_id: telegramId, username })
+      body: JSON.stringify({ telegram_id: telegramId, username, referrer_telegram_id: referrerTelegramId })
     });
     document.getElementById("balance").textContent = fmt(currentUser.nex_trade_balance);
   }
@@ -375,10 +452,71 @@
     });
   }
 
-  async function loadMarket(){
+  async function loadMarket(query){
     try{
-      const tokens = await api("/tokens");
+      const path = query && query.trim() ? `/tokens?q=${encodeURIComponent(query.trim())}` : "/tokens";
+      const tokens = await api(path);
       renderMarket(tokens);
+
+      // Izlash paytida reyting va sarlavhalarni yashiramiz - faqat natija ko'rsatiladi
+      const isSearching = Boolean(query && query.trim());
+      document.getElementById("leaderboard").style.display = isSearching ? "none" : "flex";
+      document.getElementById("leaderboard-title").style.display = isSearching ? "none" : "block";
+      document.getElementById("market-list-title").textContent = isSearching ? "Qidiruv natijalari" : "Barcha tokenlar";
+    }catch(e){ toast(e.message); }
+  }
+
+  let searchTimeout;
+  document.getElementById("search-input").addEventListener("input", (e)=>{
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(()=> loadMarket(e.target.value), 350);
+  });
+
+  async function loadProfile(){
+    document.getElementById("profile-username").textContent = "@" + (currentUser.username || "foydalanuvchi");
+    document.getElementById("profile-avatar").textContent = (currentUser.username || "?").charAt(0).toUpperCase();
+    document.getElementById("stat-balance").textContent = fmt(currentUser.nex_trade_balance);
+
+    const tgId = tg?.initDataUnsafe?.user?.id || currentUser.telegram_id;
+    const refLink = `https://t.me/${BOT_USERNAME}?start=ref_${tgId}`;
+    const linkEl = document.getElementById("referral-link");
+    linkEl.textContent = refLink;
+    linkEl.onclick = ()=>{
+      navigator.clipboard?.writeText(refLink);
+      toast("Havola nusxalandi!");
+    };
+
+    try{
+      const [myTokens, referrals] = await Promise.all([
+        api(`/user/${currentUser.id}/created-tokens`),
+        api(`/user/${currentUser.id}/referrals`)
+      ]);
+      document.getElementById("stat-tokens").textContent = myTokens.length;
+      document.getElementById("stat-referrals").textContent = referrals.count;
+
+      const list = document.getElementById("my-tokens-list");
+      if(!myTokens.length){
+        list.innerHTML = `<div class="empty">Hali token yaratmagansiz.<br>"Yaratish" bo'limidan boshlang!</div>`;
+      } else {
+        list.innerHTML = myTokens.map(t=>{
+          const fillPct = Math.min(100, (Number(t.circulating_supply)/Number(t.max_supply))*100);
+          return `
+          <div class="token-row" data-id="${t.id}" data-name="${t.name}" data-symbol="${t.symbol}" data-price="${t.current_price}">
+            <div class="token-badge">${tokenBadgeLetters(t.symbol)}</div>
+            <div class="token-info">
+              <div class="token-name">${t.name}</div>
+              <div class="token-sub">$${t.symbol} · ${fmt(t.circulating_supply)}/${fmt(t.max_supply)}</div>
+            </div>
+            <div class="token-price">
+              <div class="p num">${Number(t.current_price).toFixed(4)}</div>
+              <div class="fill"><i style="width:${fillPct}%"></i></div>
+            </div>
+          </div>`;
+        }).join("");
+        list.querySelectorAll(".token-row").forEach(row=>{
+          row.addEventListener("click", ()=> openTokenDetail(row.dataset));
+        });
+      }
     }catch(e){ toast(e.message); }
   }
 
