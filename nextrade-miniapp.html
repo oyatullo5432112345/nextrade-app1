@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>NexTrade</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0B0F1A;
+    --bg-elevated: #131826;
+    --card: #171D2E;
+    --border: #232B40;
+    --text: #EDEFF5;
+    --muted: #7C8699;
+    --gold: #FFC857;
+    --up: #00D68F;
+    --down: #FF5C72;
+    --radius: 16px;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  .num{font-family:'Space Grotesk',sans-serif;}
+
+  header.topbar{
+    padding:20px 18px 14px;
+    display:flex; flex-direction:column; gap:4px;
+  }
+  .eyebrow{
+    font-size:12px; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--muted); font-weight:600;
+  }
+  .balance-row{
+    display:flex; align-items:baseline; gap:8px; margin-top:2px;
+  }
+  .balance-num{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:34px; font-weight:700; color:var(--gold);
+  }
+  .balance-unit{ color:var(--muted); font-size:14px; font-weight:500; }
+
+  nav.tabs{
+    display:flex; gap:6px; padding:4px 18px 14px;
+  }
+  nav.tabs button{
+    flex:1; padding:10px 0; border:none; border-radius:12px;
+    background:transparent; color:var(--muted); font-weight:600; font-size:13px;
+    font-family:'Inter',sans-serif;
+  }
+  nav.tabs button.active{
+    background:var(--card); color:var(--text); border:1px solid var(--border);
+  }
+
+  main{ padding:0 18px 90px; }
+  .screen{ display:none; }
+  .screen.active{ display:block; }
+
+  .token-row{
+    display:flex; align-items:center; gap:12px;
+    background:var(--card); border:1px solid var(--border);
+    border-radius:var(--radius); padding:14px; margin-bottom:10px;
+  }
+  .token-badge{
+    width:42px; height:42px; border-radius:12px;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:15px;
+    background:linear-gradient(135deg, #232B40, #171D2E);
+    color:var(--gold); flex-shrink:0; border:1px solid var(--border);
+  }
+  .token-info{ flex:1; min-width:0; }
+  .token-name{ font-weight:600; font-size:14.5px; }
+  .token-sub{ color:var(--muted); font-size:12px; margin-top:2px; }
+  .token-spark{ width:64px; height:28px; flex-shrink:0; }
+  .token-price{ text-align:right; flex-shrink:0; }
+  .token-price .p{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:14px; }
+  .token-price .fill{
+    height:4px; border-radius:2px; background:var(--border); margin-top:6px; overflow:hidden;
+  }
+  .token-price .fill i{ display:block; height:100%; background:var(--gold); }
+
+  .card{
+    background:var(--card); border:1px solid var(--border);
+    border-radius:var(--radius); padding:16px; margin-bottom:12px;
+  }
+  .field{ margin-bottom:14px; }
+  .field label{ display:block; font-size:12.5px; color:var(--muted); margin-bottom:6px; font-weight:600; }
+  .field input{
+    width:100%; background:var(--bg-elevated); border:1px solid var(--border);
+    border-radius:10px; padding:12px 14px; color:var(--text); font-size:15px;
+    font-family:'Inter',sans-serif;
+  }
+  .field input:focus{ outline:none; border-color:var(--gold); }
+  .hint{ font-size:12px; color:var(--muted); margin-top:6px; line-height:1.5; }
+
+  button.primary{
+    width:100%; padding:14px; border:none; border-radius:12px;
+    background:var(--gold); color:#1A1200; font-weight:700; font-size:15px;
+    font-family:'Inter',sans-serif;
+  }
+  button.primary:disabled{ opacity:.5; }
+  button.ghost{
+    width:100%; padding:14px; border:1px solid var(--border); border-radius:12px;
+    background:transparent; color:var(--text); font-weight:600; font-size:15px; margin-top:8px;
+  }
+
+  .empty{
+    text-align:center; padding:60px 20px; color:var(--muted); font-size:14px;
+  }
+
+  .modal-backdrop{
+    position:fixed; inset:0; background:rgba(0,0,0,.6);
+    display:none; align-items:flex-end; z-index:50;
+  }
+  .modal-backdrop.active{ display:flex; }
+  .modal{
+    background:var(--bg-elevated); width:100%; border-radius:20px 20px 0 0;
+    padding:20px 18px 28px; border-top:1px solid var(--border);
+  }
+  .modal h3{ font-family:'Space Grotesk',sans-serif; font-size:18px; margin-bottom:4px; }
+  .modal .modal-sub{ color:var(--muted); font-size:13px; margin-bottom:16px; }
+  .buysell-toggle{ display:flex; gap:8px; margin-bottom:14px; }
+  .buysell-toggle button{
+    flex:1; padding:10px; border-radius:10px; border:1px solid var(--border);
+    background:var(--card); color:var(--muted); font-weight:700; font-size:13px;
+  }
+  .buysell-toggle button.active[data-side="buy"]{ background:rgba(0,214,143,.15); color:var(--up); border-color:var(--up); }
+  .buysell-toggle button.active[data-side="sell"]{ background:rgba(255,92,114,.15); color:var(--down); border-color:var(--down); }
+
+  #toast{
+    position:fixed; bottom:100px; left:18px; right:18px;
+    background:var(--card); border:1px solid var(--border); border-radius:12px;
+    padding:12px 16px; font-size:13.5px; text-align:center;
+    opacity:0; transform:translateY(10px); transition:.25s; pointer-events:none; z-index:60;
+  }
+  #toast.show{ opacity:1; transform:translateY(0); }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="eyebrow">Mening balansim</div>
+  <div class="balance-row">
+    <span class="balance-num num" id="balance">0</span>
+    <span class="balance-unit">Nex Trade</span>
+  </div>
+</header>
+
+<nav class="tabs">
+  <button class="tab-btn active" data-tab="market">Bozor</button>
+  <button class="tab-btn" data-tab="portfolio">Portfelim</button>
+  <button class="tab-btn" data-tab="create">Yaratish</button>
+</nav>
+
+<main>
+  <section class="screen active" id="screen-market">
+    <div id="market-list"></div>
+  </section>
+
+  <section class="screen" id="screen-portfolio">
+    <div id="portfolio-list"></div>
+  </section>
+
+  <section class="screen" id="screen-create">
+    <div class="card">
+      <div class="field">
+        <label>Token nomi</label>
+        <input id="new-name" type="text" placeholder="Masalan: Ali Coin" maxlength="64" />
+      </div>
+      <div class="field">
+        <label>Belgisi (symbol)</label>
+        <input id="new-symbol" type="text" placeholder="Masalan: ALI" maxlength="16" style="text-transform:uppercase" />
+      </div>
+      <div class="field">
+        <label>Maksimal miqdor (max 10 000)</label>
+        <input id="new-supply" type="number" placeholder="10000" max="10000" min="1" />
+        <div class="hint">Narx boshlang'ich holatda 0.0001–0.01 UZS oralig'ida avtomatik belgilanadi va faqat foydalanuvchilarning savdo faoliyatiga qarab o'zgaradi.</div>
+      </div>
+      <button class="primary" id="create-btn">Token yaratish</button>
+    </div>
+  </section>
+</main>
+
+<div id="toast"></div>
+
+<div class="modal-backdrop" id="trade-modal">
+  <div class="modal">
+    <h3 id="modal-token-name">—</h3>
+    <div class="modal-sub" id="modal-token-price">—</div>
+    <div class="buysell-toggle">
+      <button data-side="buy" class="active">Sotib olish</button>
+      <button data-side="sell">Sotish</button>
+    </div>
+    <div class="field">
+      <label>Miqdor</label>
+      <input id="trade-amount" type="number" placeholder="0" min="0" />
+    </div>
+    <button class="primary" id="trade-confirm">Tasdiqlash</button>
+    <button class="ghost" id="trade-cancel">Bekor qilish</button>
+  </div>
+</div>
+
+<script>
+  // ====== SOZLAMALAR ======
+  // Backend serveringiz ishga tushgach, shu manzilni o'zgartiring:
+  const API_BASE = "https://YOUR-SERVER-URL.com/api";
+
+  const tg = window.Telegram?.WebApp;
+  tg?.ready();
+  tg?.expand();
+
+  let currentUser = null;
+  let selectedTokenId = null;
+  let tradeSide = "buy";
+
+  function toast(msg){
+    const t = document.getElementById("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    setTimeout(()=>t.classList.remove("show"), 2200);
+  }
+
+  function fmt(n){
+    return Number(n).toLocaleString("uz-UZ", { maximumFractionDigits: 4 });
+  }
+
+  // Tab almashtirish
+  document.querySelectorAll(".tab-btn").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));
+      document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+      btn.classList.add("active");
+      document.getElementById("screen-"+btn.dataset.tab).classList.add("active");
+      if(btn.dataset.tab === "portfolio") loadPortfolio();
+    });
+  });
+
+  async function api(path, opts={}){
+    const res = await fetch(API_BASE + path, {
+      headers: { "Content-Type": "application/json" },
+      ...opts
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error || "Xatolik yuz berdi");
+    return data;
+  }
+
+  async function initUser(){
+    const tgUser = tg?.initDataUnsafe?.user;
+    const telegramId = tgUser?.id || 000000; // brauzerda sinash uchun zaxira ID
+    const username = tgUser?.username || "sinov";
+    currentUser = await api("/user/init", {
+      method:"POST",
+      body: JSON.stringify({ telegram_id: telegramId, username })
+    });
+    document.getElementById("balance").textContent = fmt(currentUser.nex_trade_balance);
+  }
+
+  function tokenBadgeLetters(symbol){
+    return symbol.slice(0,3).toUpperCase();
+  }
+
+  function renderMarket(tokens){
+    const list = document.getElementById("market-list");
+    if(!tokens.length){
+      list.innerHTML = `<div class="empty">Hozircha tokenlar yo'q.<br>Birinchi bo'lib o'zingiznikini yarating!</div>`;
+      return;
+    }
+    list.innerHTML = tokens.map(t=>{
+      const fillPct = Math.min(100, (Number(t.circulating_supply)/Number(t.max_supply))*100);
+      return `
+      <div class="token-row" data-id="${t.id}" data-name="${t.name}" data-symbol="${t.symbol}" data-price="${t.current_price}">
+        <div class="token-badge">${tokenBadgeLetters(t.symbol)}</div>
+        <div class="token-info">
+          <div class="token-name">${t.name}</div>
+          <div class="token-sub">$${t.symbol} · ${fmt(t.circulating_supply)}/${fmt(t.max_supply)}</div>
+        </div>
+        <div class="token-price">
+          <div class="p num">${Number(t.current_price).toFixed(4)}</div>
+          <div class="fill"><i style="width:${fillPct}%"></i></div>
+        </div>
+      </div>`;
+    }).join("");
+
+    list.querySelectorAll(".token-row").forEach(row=>{
+      row.addEventListener("click", ()=> openTradeModal(row.dataset));
+    });
+  }
+
+  async function loadMarket(){
+    try{
+      const tokens = await api("/tokens");
+      renderMarket(tokens);
+    }catch(e){ toast(e.message); }
+  }
+
+  async function loadPortfolio(){
+    const list = document.getElementById("portfolio-list");
+    try{
+      const holdings = await api(`/user/${currentUser.id}/holdings`);
+      if(!holdings.length){
+        list.innerHTML = `<div class="empty">Portfelingiz bo'sh.<br>Bozordan token sotib oling.</div>`;
+        return;
+      }
+      list.innerHTML = holdings.map(h=>`
+        <div class="token-row" data-id="${h.token_id}" data-name="${h.name}" data-symbol="${h.symbol}" data-price="${h.current_price}">
+          <div class="token-badge">${tokenBadgeLetters(h.symbol)}</div>
+          <div class="token-info">
+            <div class="token-name">${h.name}</div>
+            <div class="token-sub">${fmt(h.amount)} ta token</div>
+          </div>
+          <div class="token-price">
+            <div class="p num">${Number(h.current_price).toFixed(4)}</div>
+          </div>
+        </div>
+      `).join("");
+      list.querySelectorAll(".token-row").forEach(row=>{
+        row.addEventListener("click", ()=> openTradeModal(row.dataset));
+      });
+    }catch(e){ toast(e.message); }
+  }
+
+  function openTradeModal(data){
+    selectedTokenId = data.id;
+    document.getElementById("modal-token-name").textContent = `${data.name} · $${data.symbol}`;
+    document.getElementById("modal-token-price").textContent = `Joriy narx: ${Number(data.price).toFixed(4)} UZS`;
+    document.getElementById("trade-amount").value = "";
+    document.getElementById("trade-modal").classList.add("active");
+  }
+
+  document.getElementById("trade-cancel").addEventListener("click", ()=>{
+    document.getElementById("trade-modal").classList.remove("active");
+  });
+
+  document.querySelectorAll(".buysell-toggle button").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      document.querySelectorAll(".buysell-toggle button").forEach(b=>b.classList.remove("active"));
+      btn.classList.add("active");
+      tradeSide = btn.dataset.side;
+    });
+  });
+
+  document.getElementById("trade-confirm").addEventListener("click", async ()=>{
+    const amount = Number(document.getElementById("trade-amount").value);
+    if(!amount || amount <= 0){ toast("Miqdorni kiriting"); return; }
+    try{
+      const endpoint = tradeSide === "buy" ? "/trade/buy" : "/trade/sell";
+      const result = await api(endpoint, {
+        method:"POST",
+        body: JSON.stringify({ user_id: currentUser.id, token_id: Number(selectedTokenId), amount })
+      });
+      toast(tradeSide === "buy" ? "Sotib olindi!" : "Sotildi!");
+      document.getElementById("trade-modal").classList.remove("active");
+      await initUser();
+      await loadMarket();
+    }catch(e){ toast(e.message); }
+  });
+
+  document.getElementById("create-btn").addEventListener("click", async ()=>{
+    const name = document.getElementById("new-name").value.trim();
+    const symbol = document.getElementById("new-symbol").value.trim();
+    const supply = Number(document.getElementById("new-supply").value);
+    if(!name || !symbol || !supply){ toast("Hamma maydonlarni to'ldiring"); return; }
+    try{
+      await api("/tokens", {
+        method:"POST",
+        body: JSON.stringify({ owner_id: currentUser.id, name, symbol, max_supply: supply })
+      });
+      toast("Token yaratildi!");
+      document.getElementById("new-name").value = "";
+      document.getElementById("new-symbol").value = "";
+      document.getElementById("new-supply").value = "";
+      document.querySelector('[data-tab="market"]').click();
+      await loadMarket();
+    }catch(e){ toast(e.message); }
+  });
+
+  (async function start(){
+    await initUser();
+    await loadMarket();
+  })();
+</script>
+</body>
+</html>
