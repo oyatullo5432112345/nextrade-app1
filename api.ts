@@ -1,7 +1,13 @@
 import { Router } from "express";
 import { z } from "zod";
 import { getOrCreateUser, getUserHoldings } from "../services/userService";
-import { createToken, getToken, listTopTokens } from "../services/tokenService";
+import {
+  createToken,
+  getToken,
+  listTopTokens,
+  listLeaderboard,
+  getTokenHistory,
+} from "../services/tokenService";
 import { buyToken, sellToken } from "../services/tradeService";
 
 export const apiRouter = Router();
@@ -59,6 +65,18 @@ apiRouter.get("/tokens/:id", async (req, res) => {
   const token = await getToken(Number(req.params.id));
   if (!token) return res.status(404).json({ error: "Token topilmadi" });
   res.json(token);
+});
+
+// Bozor qiymati bo'yicha eng yuqori tokenlar (reyting)
+apiRouter.get("/leaderboard", async (_req, res) => {
+  const tokens = await listLeaderboard();
+  res.json(tokens);
+});
+
+// Bitta tokenning savdo tarixi (grafik va ro'yxat uchun)
+apiRouter.get("/tokens/:id/history", async (req, res) => {
+  const history = await getTokenHistory(Number(req.params.id));
+  res.json(history);
 });
 
 // Sotib olish

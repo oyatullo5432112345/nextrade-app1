@@ -38,3 +38,34 @@ export async function listTopTokens(limit = 20) {
   );
   return result.rows;
 }
+
+/**
+ * Bosh sahifadagi reyting uchun - narx * muomaladagi miqdor (bozor qiymati)
+ * bo'yicha eng yuqori tokenlar.
+ */
+export async function listLeaderboard(limit = 5) {
+  const result = await pool.query(
+    `SELECT *, (current_price * circulating_supply) AS market_value
+     FROM tokens
+     ORDER BY market_value DESC
+     LIMIT $1`,
+    [limit]
+  );
+  return result.rows;
+}
+
+/**
+ * Bitta tokenning so'nggi savdo tarixi - narx grafigi va tranzaksiyalar
+ * ro'yxati uchun ishlatiladi.
+ */
+export async function getTokenHistory(tokenId: number, limit = 50) {
+  const result = await pool.query(
+    `SELECT type, amount, price, total_cost, created_at
+     FROM transactions
+     WHERE token_id = $1
+     ORDER BY created_at DESC
+     LIMIT $2`,
+    [tokenId, limit]
+  );
+  return result.rows.reverse(); // eskidan yangiga tartib - grafik uchun qulay
+}

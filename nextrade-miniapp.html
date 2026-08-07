@@ -134,6 +134,63 @@
   .buysell-toggle button.active[data-side="buy"]{ background:rgba(0,214,143,.15); color:var(--up); border-color:var(--up); }
   .buysell-toggle button.active[data-side="sell"]{ background:rgba(255,92,114,.15); color:var(--down); border-color:var(--down); }
 
+  /* Reyting (leaderboard) */
+  .leaderboard{
+    display:flex; gap:10px; overflow-x:auto; padding:2px 2px 14px;
+    -webkit-overflow-scrolling:touch;
+  }
+  .leaderboard::-webkit-scrollbar{ display:none; }
+  .lb-card{
+    flex-shrink:0; width:118px; background:var(--card); border:1px solid var(--border);
+    border-radius:14px; padding:12px; position:relative;
+  }
+  .lb-rank{
+    position:absolute; top:8px; right:10px; font-family:'Space Grotesk',sans-serif;
+    font-weight:700; font-size:12px; color:var(--gold); opacity:.7;
+  }
+  .lb-badge{
+    width:34px; height:34px; border-radius:10px; background:var(--bg-elevated);
+    border:1px solid var(--border); display:flex; align-items:center; justify-content:center;
+    font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:12px; color:var(--gold);
+    margin-bottom:8px;
+  }
+  .lb-name{ font-size:12.5px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .lb-price{ font-family:'Space Grotesk',sans-serif; font-size:12px; color:var(--muted); margin-top:2px; }
+  .section-title{
+    font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted);
+    font-weight:700; margin:4px 0 10px;
+  }
+
+  /* Token tafsilot ekrani */
+  .detail-overlay{
+    position:fixed; inset:0; background:var(--bg); z-index:70;
+    display:none; flex-direction:column; overflow-y:auto;
+  }
+  .detail-overlay.active{ display:flex; }
+  .detail-header{
+    display:flex; align-items:center; gap:12px; padding:18px;
+    border-bottom:1px solid var(--border);
+  }
+  .back-btn{
+    width:34px; height:34px; border-radius:10px; background:var(--card);
+    border:1px solid var(--border); color:var(--text); font-size:16px;
+  }
+  .detail-body{ padding:18px; flex:1; }
+  .detail-price-big{
+    font-family:'Space Grotesk',sans-serif; font-size:30px; font-weight:700; color:var(--gold);
+  }
+  .detail-meta{ color:var(--muted); font-size:13px; margin-top:2px; }
+  canvas#priceChart{ width:100%; height:140px; margin:18px 0; }
+  .history-row{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:10px 0; border-bottom:1px solid var(--border); font-size:13px;
+  }
+  .history-row .side-buy{ color:var(--up); font-weight:600; }
+  .history-row .side-sell{ color:var(--down); font-weight:600; }
+  .history-row .h-time{ color:var(--muted); font-size:11.5px; }
+  .detail-actions{ display:flex; gap:10px; margin:16px 0; }
+  .detail-actions button{ flex:1; }
+
   #toast{
     position:fixed; bottom:100px; left:18px; right:18px;
     background:var(--card); border:1px solid var(--border); border-radius:12px;
@@ -161,6 +218,9 @@
 
 <main>
   <section class="screen active" id="screen-market">
+    <div class="section-title">Top tokenlar</div>
+    <div class="leaderboard" id="leaderboard"></div>
+    <div class="section-title">Barcha tokenlar</div>
     <div id="market-list"></div>
   </section>
 
@@ -204,6 +264,27 @@
     </div>
     <button class="primary" id="trade-confirm">Tasdiqlash</button>
     <button class="ghost" id="trade-cancel">Bekor qilish</button>
+  </div>
+</div>
+
+<div class="detail-overlay" id="detail-overlay">
+  <div class="detail-header">
+    <button class="back-btn" id="detail-back">←</button>
+    <div>
+      <div id="detail-name" style="font-weight:700;font-size:15px;">—</div>
+      <div class="detail-meta" id="detail-symbol">—</div>
+    </div>
+  </div>
+  <div class="detail-body">
+    <div class="detail-price-big num" id="detail-price">0.0000</div>
+    <div class="detail-meta" id="detail-supply">—</div>
+    <canvas id="priceChart" height="140"></canvas>
+    <div class="detail-actions">
+      <button class="primary" id="detail-buy">Sotib olish</button>
+      <button class="ghost" id="detail-sell" style="margin-top:0;">Sotish</button>
+    </div>
+    <div class="section-title">Savdo tarixi</div>
+    <div id="history-list"></div>
   </div>
 </div>
 
@@ -290,7 +371,7 @@
     }).join("");
 
     list.querySelectorAll(".token-row").forEach(row=>{
-      row.addEventListener("click", ()=> openTradeModal(row.dataset));
+      row.addEventListener("click", ()=> openTokenDetail(row.dataset));
     });
   }
 
@@ -299,6 +380,32 @@
       const tokens = await api("/tokens");
       renderMarket(tokens);
     }catch(e){ toast(e.message); }
+  }
+
+  function renderLeaderboard(tokens){
+    const wrap = document.getElementById("leaderboard");
+    if(!tokens.length){
+      wrap.innerHTML = `<div class="hint">Hali reyting shakllanmagan</div>`;
+      return;
+    }
+    wrap.innerHTML = tokens.map((t,i)=>`
+      <div class="lb-card" data-id="${t.id}" data-name="${t.name}" data-symbol="${t.symbol}" data-price="${t.current_price}">
+        <div class="lb-rank">#${i+1}</div>
+        <div class="lb-badge">${tokenBadgeLetters(t.symbol)}</div>
+        <div class="lb-name">${t.name}</div>
+        <div class="lb-price num">${Number(t.current_price).toFixed(4)}</div>
+      </div>
+    `).join("");
+    wrap.querySelectorAll(".lb-card").forEach(card=>{
+      card.addEventListener("click", ()=> openTokenDetail(card.dataset));
+    });
+  }
+
+  async function loadLeaderboard(){
+    try{
+      const tokens = await api("/leaderboard");
+      renderLeaderboard(tokens);
+    }catch(e){ /* jim */ }
   }
 
   async function loadPortfolio(){
@@ -322,9 +429,121 @@
         </div>
       `).join("");
       list.querySelectorAll(".token-row").forEach(row=>{
-        row.addEventListener("click", ()=> openTradeModal(row.dataset));
+        row.addEventListener("click", ()=> openTokenDetail(row.dataset));
       });
     }catch(e){ toast(e.message); }
+  }
+
+  // ====== TOKEN TAFSILOT EKRANI (grafik + tarix) ======
+  async function openTokenDetail(data){
+    selectedTokenId = data.id;
+    document.getElementById("detail-name").textContent = data.name;
+    document.getElementById("detail-symbol").textContent = "$" + data.symbol;
+    document.getElementById("detail-price").textContent = Number(data.price).toFixed(4);
+    document.getElementById("detail-overlay").classList.add("active");
+
+    try{
+      const token = await api(`/tokens/${data.id}`);
+      document.getElementById("detail-supply").textContent =
+        `${fmt(token.circulating_supply)} / ${fmt(token.max_supply)} muomalada`;
+
+      const history = await api(`/tokens/${data.id}/history`);
+      drawPriceChart(history, Number(token.base_price));
+      renderHistoryList(history);
+    }catch(e){ toast(e.message); }
+  }
+
+  document.getElementById("detail-back").addEventListener("click", ()=>{
+    document.getElementById("detail-overlay").classList.remove("active");
+  });
+
+  document.getElementById("detail-buy").addEventListener("click", ()=>{
+    document.querySelectorAll(".buysell-toggle button").forEach(b=>b.classList.remove("active"));
+    document.querySelector('[data-side="buy"]').classList.add("active");
+    tradeSide = "buy";
+    openTradeModal({
+      id: selectedTokenId,
+      name: document.getElementById("detail-name").textContent,
+      symbol: document.getElementById("detail-symbol").textContent.replace("$",""),
+      price: document.getElementById("detail-price").textContent
+    });
+  });
+
+  document.getElementById("detail-sell").addEventListener("click", ()=>{
+    document.querySelectorAll(".buysell-toggle button").forEach(b=>b.classList.remove("active"));
+    document.querySelector('[data-side="sell"]').classList.add("active");
+    tradeSide = "sell";
+    openTradeModal({
+      id: selectedTokenId,
+      name: document.getElementById("detail-name").textContent,
+      symbol: document.getElementById("detail-symbol").textContent.replace("$",""),
+      price: document.getElementById("detail-price").textContent
+    });
+  });
+
+  function drawPriceChart(history, basePrice){
+    const canvas = document.getElementById("priceChart");
+    const ctx = canvas.getContext("2d");
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth, h = canvas.clientHeight || 140;
+    canvas.width = w * dpr; canvas.height = h * dpr;
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0,0,w,h);
+
+    const prices = history.length ? history.map(x=>Number(x.price)) : [basePrice, basePrice];
+    const min = Math.min(...prices), max = Math.max(...prices);
+    const pad = (max - min) * 0.15 || max * 0.1 || 0.0001;
+    const yMin = min - pad, yMax = max + pad;
+
+    const points = prices.map((p,i)=>{
+      const x = prices.length > 1 ? (i/(prices.length-1)) * w : w/2;
+      const y = h - ((p - yMin)/(yMax - yMin)) * h;
+      return [x,y];
+    });
+
+    // Gradient ostki maydon
+    const grad = ctx.createLinearGradient(0,0,0,h);
+    grad.addColorStop(0, "rgba(255,200,87,.25)");
+    grad.addColorStop(1, "rgba(255,200,87,0)");
+    ctx.beginPath();
+    ctx.moveTo(points[0][0], h);
+    points.forEach(([x,y])=>ctx.lineTo(x,y));
+    ctx.lineTo(points[points.length-1][0], h);
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // Chiziq
+    ctx.beginPath();
+    points.forEach(([x,y],i)=> i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y));
+    ctx.strokeStyle = "#FFC857";
+    ctx.lineWidth = 2;
+    ctx.lineJoin = "round";
+    ctx.stroke();
+  }
+
+  function renderHistoryList(history){
+    const wrap = document.getElementById("history-list");
+    if(!history.length){
+      wrap.innerHTML = `<div class="empty">Hali savdo bo'lmagan</div>`;
+      return;
+    }
+    wrap.innerHTML = history.slice().reverse().map(h=>{
+      const time = new Date(h.created_at).toLocaleString("uz-UZ", { day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit" });
+      const sideLabel = h.type === "buy" ? "Sotib olindi" : "Sotildi";
+      const sideClass = h.type === "buy" ? "side-buy" : "side-sell";
+      return `
+        <div class="history-row">
+          <div>
+            <span class="${sideClass}">${sideLabel}</span>
+            <div class="h-time">${time}</div>
+          </div>
+          <div style="text-align:right;">
+            <div class="num">${fmt(h.amount)} ta</div>
+            <div class="h-time">${Number(h.price).toFixed(4)} UZS</div>
+          </div>
+        </div>`;
+    }).join("");
   }
 
   function openTradeModal(data){
@@ -360,6 +579,16 @@
       document.getElementById("trade-modal").classList.remove("active");
       await initUser();
       await loadMarket();
+      await loadLeaderboard();
+      if(document.getElementById("detail-overlay").classList.contains("active")){
+        const token = await api(`/tokens/${selectedTokenId}`);
+        document.getElementById("detail-price").textContent = Number(token.current_price).toFixed(4);
+        document.getElementById("detail-supply").textContent =
+          `${fmt(token.circulating_supply)} / ${fmt(token.max_supply)} muomalada`;
+        const history = await api(`/tokens/${selectedTokenId}/history`);
+        drawPriceChart(history, Number(token.base_price));
+        renderHistoryList(history);
+      }
     }catch(e){ toast(e.message); }
   });
 
@@ -385,6 +614,7 @@
   (async function start(){
     await initUser();
     await loadMarket();
+    await loadLeaderboard();
   })();
 </script>
 </body>
