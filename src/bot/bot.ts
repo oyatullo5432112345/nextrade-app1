@@ -101,3 +101,10 @@ export async function getPlatformStats() {
   `);
   return result.rows[0];
 }
+
+export const userService = {
+  getOrCreateUser,
+  getUserHoldings,
+  getReferralCount,
+  getPlatformStats,
+};
