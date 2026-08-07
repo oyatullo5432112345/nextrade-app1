@@ -1,110 +1,76 @@
-import { pool } from "../db/pool";
+import { Bot, InlineKeyboard } from "grammy";
+import dotenv from "dotenv";
+import { getOrCreateUser, getPlatformStats } from "../services/userService";
 
-const INITIAL_NEX_TRADE_BALANCE = 100;
-const REFERRAL_BONUS = 20; // taklif qilgan va qilingan foydalanuvchiga qo'shimcha bonus
+dotenv.config();
 
-export interface User {
-  id: number;
-  telegram_id: number;
-  username: string | null;
-  nex_trade_balance: string;
-  referred_by: number | null;
-}
+const BOT_TOKEN = process.env.BOT_TOKEN ?? "";
+const MINI_APP_URL = process.env.MINI_APP_URL ?? "https://example.com";
+const BOT_USERNAME = process.env.BOT_USERNAME ?? "your_bot";
+const ADMIN_TELEGRAM_ID = Number(process.env.ADMIN_TELEGRAM_ID ?? "0");
 
-/**
- * Foydalanuvchini topadi yoki yo'q bo'lsa, 100 ta Nex Trade balans bilan yaratadi.
- * Agar referrerTelegramId berilgan bo'lsa (referal havolasi orqali kirgan bo'lsa),
- * ikkala tomonga ham qo'shimcha REFERRAL_BONUS beriladi.
- */
-export async function getOrCreateUser(
-  telegramId: number,
-  username?: string,
-  referrerTelegramId?: number
-): Promise<User> {
-  const existing = await pool.query<User>(
-    "SELECT * FROM users WHERE telegram_id = $1",
-    [telegramId]
-  );
+export const bot = new Bot(BOT_TOKEN);
 
-  if (existing.rows.length > 0) {
-    return existing.rows[0];
+bot.command("start", async (ctx) => {
+  const telegramId = ctx.from?.id;
+  const username = ctx.from?.username;
+  if (!telegramId) return;
+
+  const payload = ctx.match;
+  let referrerTelegramId: number | undefined;
+  if (typeof payload === "string" && payload.startsWith("ref_")) {
+    const parsed = Number(payload.replace("ref_", ""));
+    if (!isNaN(parsed)) referrerTelegramId = parsed;
   }
 
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
+  const user = await getOrCreateUser(telegramId, username, referrerTelegramId);
 
-    let referrerId: number | null = null;
-    if (referrerTelegramId && referrerTelegramId !== telegramId) {
-      const referrer = await client.query<User>(
-        "SELECT * FROM users WHERE telegram_id = $1 FOR UPDATE",
-        [referrerTelegramId]
-      );
-      if (referrer.rows.length > 0) {
-        referrerId = referrer.rows[0].id;
-        await client.query(
-          "UPDATE users SET nex_trade_balance = nex_trade_balance + $1 WHERE id = $2",
-          [REFERRAL_BONUS, referrerId]
-        );
-      }
-    }
+  const keyboard = new InlineKeyboard().webApp("🚀 NexTrade'ni ochish", MINI_APP_URL);
 
-    const initialBalance =
-      INITIAL_NEX_TRADE_BALANCE + (referrerId ? REFERRAL_BONUS : 0);
+  const bonusNote = referrerTelegramId
+    ? "\n\n🎁 Referal havolasi orqali kirganingiz uchun qo'shimcha bonus qo'shildi!"
+    : "";
 
-    const created = await client.query<User>(
-      `INSERT INTO users (telegram_id, username, nex_trade_balance, referred_by)
-       VALUES ($1, $2, $3, $4) RETURNING *`,
-      [telegramId, username ?? null, initialBalance, referrerId]
-    );
+  await ctx.reply(
+    `NexTrade platformasiga xush kelibsiz!\n\n` +
+      `💰 Balansingiz: ${user.nex_trade_balance} Nex Trade\n\n` +
+      `NexTrade — bu o'zingizning shaxsiy tokeningizni yaratib, boshqa foydalanuvchilar bilan erkin savdo qilishingiz mumkin bo'lgan platforma. ` +
+      `Token narxi faqat bozor talabiga (sotib olish/sotish) qarab avtomatik o'zgaradi.${bonusNote}\n\n` +
+      `Pastdagi tugma orqali ilovani oching 👇\n\n` +
+      `Do'stlaringizni taklif qilib bonus olish uchun /referral buyrug'ini yuboring.`,
+    { reply_markup: keyboard }
+  );
+});
 
-    await client.query("COMMIT");
-    return created.rows[0];
-  } catch (err) {
-    await client.query("ROLLBACK");
-    throw err;
-  } finally {
-    client.release();
+bot.command("referral", async (ctx) => {
+  const telegramId = ctx.from?.id;
+  if (!telegramId) return;
+
+  const link = `https://t.me/${BOT_USERNAME}?start=ref_${telegramId}`;
+  await ctx.reply(
+    `👥 Do'stlaringizni taklif qiling va bonus Nex Trade oling!\n\n` +
+      `Har bir yangi do'stingiz ushbu havola orqali qo'shilganda, ikkalangizga ham qo'shimcha bonus beriladi.\n\n` +
+      `Sizning shaxsiy havolangiz:\n${link}`
+  );
+});
+
+bot.catch((err) => {
+  console.error("Bot xatosi:", err);
+});
+
+bot.command("stats", async (ctx) => {
+  const telegramId = ctx.from?.id;
+  if (!telegramId || telegramId !== ADMIN_TELEGRAM_ID) {
+    return;
   }
-}
 
-export async function getUserHoldings(userId: number) {
-  const result = await pool.query(
-    `SELECT h.token_id, t.name, t.symbol, h.amount, t.current_price
-     FROM holdings h
-     JOIN tokens t ON t.id = h.token_id
-     WHERE h.user_id = $1 AND h.amount > 0`,
-    [userId]
+  const stats = await getPlatformStats();
+  await ctx.reply(
+    `📊 Platforma statistikasi\n\n` +
+      `👥 Foydalanuvchilar: ${stats.total_users}\n` +
+      `🪙 Yaratilgan tokenlar: ${stats.total_tokens}\n` +
+      `💰 Muomaladagi Nex Trade: ${Number(stats.total_nex_trade_circulating).toFixed(2)}\n` +
+      `🔁 Jami savdolar: ${stats.total_trades}\n` +
+      `📈 Savdo hajmi: ${Number(stats.total_volume).toFixed(2)} Nex Trade`
   );
-  return result.rows;
-}
-
-/**
- * Admin uchun umumiy platforma statistikasi.
- */
-export async function getReferralCount(userId: number): Promise<number> {
-  const result = await pool.query(
-    "SELECT COUNT(*)::int AS count FROM users WHERE referred_by = $1",
-    [userId]
-  );
-  return result.rows[0].count;
-}
-
-export async function getPlatformStats() {
-  const result = await pool.query(`
-    SELECT
-      (SELECT COUNT(*)::int FROM users) AS total_users,
-      (SELECT COUNT(*)::int FROM tokens) AS total_tokens,
-      (SELECT COALESCE(SUM(nex_trade_balance), 0) FROM users) AS total_nex_trade_circulating,
-      (SELECT COUNT(*)::int FROM transactions) AS total_trades,
-      (SELECT COALESCE(SUM(total_cost), 0) FROM transactions WHERE type = 'buy') AS total_volume
-  `);
-  return result.rows[0];
-}
-
-export const userService = {
-  getOrCreateUser,
-  getUserHoldings,
-  getReferralCount,
-  getPlatformStats,
-};
+});
