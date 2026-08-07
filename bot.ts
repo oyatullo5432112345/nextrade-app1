@@ -1,12 +1,13 @@
 import { Bot, InlineKeyboard } from "grammy";
 import dotenv from "dotenv";
-import { getOrCreateUser } from "../services/userService";
+import { getOrCreateUser, getPlatformStats } from "../services/userService";
 
 dotenv.config();
 
 const BOT_TOKEN = process.env.BOT_TOKEN ?? "";
 const MINI_APP_URL = process.env.MINI_APP_URL ?? "https://example.com";
-const BOT_USERNAME = process.env.BOT_USERNAME ?? "your_bot"; // @siz - referal havolasi uchun
+const BOT_USERNAME = process.env.BOT_USERNAME ?? "your_bot";
+const ADMIN_TELEGRAM_ID = Number(process.env.ADMIN_TELEGRAM_ID ?? "0");
 
 export const bot = new Bot(BOT_TOKEN);
 
@@ -58,4 +59,22 @@ bot.command("referral", async (ctx) => {
 
 bot.catch((err) => {
   console.error("Bot xatosi:", err);
+});
+
+// Faqat admin uchun - platforma statistikasi
+bot.command("stats", async (ctx) => {
+  const telegramId = ctx.from?.id;
+  if (!telegramId || telegramId !== ADMIN_TELEGRAM_ID) {
+    return; // admin bo'lmasa, hech qanday javob bermaydi (yashirin buyruq)
+  }
+
+  const stats = await getPlatformStats();
+  await ctx.reply(
+    `📊 Platforma statistikasi\n\n` +
+      `👥 Foydalanuvchilar: ${stats.total_users}\n` +
+      `🪙 Yaratilgan tokenlar: ${stats.total_tokens}\n` +
+      `💰 Muomaladagi Nex Trade: ${Number(stats.total_nex_trade_circulating).toFixed(2)}\n` +
+      `🔁 Jami savdolar: ${stats.total_trades}\n` +
+      `📈 Savdo hajmi: ${Number(stats.total_volume).toFixed(2)} Nex Trade`
+  );
 });

@@ -80,7 +80,7 @@ export async function getUserHoldings(userId: number) {
 }
 
 /**
- * Foydalanuvchi nechta odam taklif qilganini hisoblaydi (profil uchun).
+ * Admin uchun umumiy platforma statistikasi.
  */
 export async function getReferralCount(userId: number): Promise<number> {
   const result = await pool.query(
@@ -88,4 +88,16 @@ export async function getReferralCount(userId: number): Promise<number> {
     [userId]
   );
   return result.rows[0].count;
+}
+
+export async function getPlatformStats() {
+  const result = await pool.query(`
+    SELECT
+      (SELECT COUNT(*)::int FROM users) AS total_users,
+      (SELECT COUNT(*)::int FROM tokens) AS total_tokens,
+      (SELECT COALESCE(SUM(nex_trade_balance), 0) FROM users) AS total_nex_trade_circulating,
+      (SELECT COUNT(*)::int FROM transactions) AS total_trades,
+      (SELECT COALESCE(SUM(total_cost), 0) FROM transactions WHERE type = 'buy') AS total_volume
+  `);
+  return result.rows[0];
 }
