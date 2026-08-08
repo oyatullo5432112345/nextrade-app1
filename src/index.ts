@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import { apiRouter } from "./routes/api";
 import { bot } from "./bot/bot";
 import { startPriceFluctuations } from "./services/priceFluctuationService";
+import { ensureSchema } from "./db/ensureSchema";
 
 dotenv.config();
 
@@ -14,11 +15,17 @@ app.use("/api", apiRouter);
 
 const PORT = process.env.PORT ?? 3000;
 
-app.listen(PORT, () => {
-  console.log(`✅ Server ${PORT}-portda ishga tushdi`);
-});
+async function bootstrap() {
+  await ensureSchema();
 
-bot.start();
-console.log("✅ Telegram bot ishga tushdi");
+  app.listen(PORT, () => {
+    console.log(`✅ Server ${PORT}-portda ishga tushdi`);
+  });
 
-startPriceFluctuations();
+  bot.start();
+  console.log("✅ Telegram bot ishga tushdi");
+
+  startPriceFluctuations();
+}
+
+bootstrap();
