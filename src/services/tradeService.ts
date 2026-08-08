@@ -181,7 +181,7 @@ export async function sellToken(userId: number, tokenId: number, amount: number)
     // Agar barcha token sotilsa, keyingi xariddan yangi hisob boshlanishi uchun avg_cost ni 0 ga tushiramiz.
     const remaining = Number(holding.amount) - amount;
     await client.query(
-      "UPDATE holdings SET amount = $1, avg_cost = CASE WHEN $1 <= 0 THEN 0 ELSE avg_cost END WHERE user_id = $2 AND token_id = $3",
+      "UPDATE holdings SET amount = $1::numeric, avg_cost = CASE WHEN $1::numeric <= 0 THEN 0 ELSE avg_cost END WHERE user_id = $2 AND token_id = $3",
       [remaining, userId, tokenId]
     );
 
