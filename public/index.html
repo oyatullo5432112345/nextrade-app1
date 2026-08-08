@@ -366,6 +366,7 @@
   let currentUser = null;
   let selectedTokenId = null;
   let tradeSide = "buy";
+  let detailRefreshInterval = null;
 
   function toast(msg){
     const t = document.getElementById("toast");
@@ -572,6 +573,22 @@
   }
 
   // ====== TOKEN TAFSILOT EKRANI (grafik + tarix) ======
+  async function refreshTokenDetail(tokenId){
+    try{
+      const token = await api(`/tokens/${tokenId}`);
+      document.getElementById("detail-price").textContent = Number(token.current_price).toFixed(4);
+      document.getElementById("detail-supply").textContent =
+        `${fmt(token.circulating_supply)} / ${fmt(token.max_supply)} muomalada`;
+
+      const [chart, history] = await Promise.all([
+        api(`/tokens/${tokenId}/chart`),
+        api(`/tokens/${tokenId}/history`)
+      ]);
+      drawPriceChart(chart, Number(token.base_price));
+      renderHistoryList(history);
+    }catch(e){ /* jim - fon yangilanishida toast chiqarmaymiz */ }
+  }
+
   async function openTokenDetail(data){
     selectedTokenId = data.id;
     document.getElementById("detail-name").textContent = data.name;
@@ -579,19 +596,16 @@
     document.getElementById("detail-price").textContent = Number(data.price).toFixed(4);
     document.getElementById("detail-overlay").classList.add("active");
 
-    try{
-      const token = await api(`/tokens/${data.id}`);
-      document.getElementById("detail-supply").textContent =
-        `${fmt(token.circulating_supply)} / ${fmt(token.max_supply)} muomalada`;
+    await refreshTokenDetail(data.id);
 
-      const history = await api(`/tokens/${data.id}/history`);
-      drawPriceChart(history, Number(token.base_price));
-      renderHistoryList(history);
-    }catch(e){ toast(e.message); }
+    // Bu token ochiq turgan paytda narx har 10 soniyada avtomatik yangilanadi
+    if(detailRefreshInterval) clearInterval(detailRefreshInterval);
+    detailRefreshInterval = setInterval(()=> refreshTokenDetail(selectedTokenId), 10000);
   }
 
   document.getElementById("detail-back").addEventListener("click", ()=>{
     document.getElementById("detail-overlay").classList.remove("active");
+    if(detailRefreshInterval){ clearInterval(detailRefreshInterval); detailRefreshInterval = null; }
   });
 
   document.getElementById("detail-buy").addEventListener("click", ()=>{
@@ -718,13 +732,7 @@
       await loadMarket();
       await loadLeaderboard();
       if(document.getElementById("detail-overlay").classList.contains("active")){
-        const token = await api(`/tokens/${selectedTokenId}`);
-        document.getElementById("detail-price").textContent = Number(token.current_price).toFixed(4);
-        document.getElementById("detail-supply").textContent =
-          `${fmt(token.circulating_supply)} / ${fmt(token.max_supply)} muomalada`;
-        const history = await api(`/tokens/${selectedTokenId}/history`);
-        drawPriceChart(history, Number(token.base_price));
-        renderHistoryList(history);
+        await refreshTokenDetail(selectedTokenId);
       }
     }catch(e){ toast(e.message); }
   });
@@ -755,4 +763,4 @@
   })();
 </script>
 </body>
-</html>
+                                                                                   </html>
