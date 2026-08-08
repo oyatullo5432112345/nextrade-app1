@@ -64,3 +64,55 @@ ALTER TABLE transactions ALTER COLUMN price TYPE NUMERIC(20, 8);
 
 -- Kunlik bonus oxirgi marta qachon olinganini kuzatish uchun
 ALTER TABLE users ADD COLUMN IF NOT EXISTS last_daily_bonus_at TIMESTAMP;
+
+-- Portfelda foyda/zarar foizini hisoblash uchun o'rtacha xarid narxi
+ALTER TABLE holdings ADD COLUMN IF NOT EXISTS avg_cost NUMERIC(20, 8) NOT NULL DEFAULT 0;
+
+-- Sevimli tokenlar
+CREATE TABLE IF NOT EXISTS favorites (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    token_id INTEGER NOT NULL REFERENCES tokens(id),
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    UNIQUE(user_id, token_id)
+);
+CREATE INDEX IF NOT EXISTS idx_favorites_user ON favorites(user_id);
+
+-- Foydalanuvchi tanlagan tokenlar uchun narx bildirishnomalari
+CREATE TABLE IF NOT EXISTS token_alerts (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    token_id INTEGER NOT NULL REFERENCES tokens(id),
+    threshold_pct NUMERIC(5, 2) NOT NULL DEFAULT 5,
+    last_notified_price NUMERIC(20, 8),
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    UNIQUE(user_id, token_id)
+);
+CREATE INDEX IF NOT EXISTS idx_token_alerts_token ON token_alerts(token_id);
+
+-- Savdo komissiyasi: har bir sotib olish/sotishda 0.25% komissiya olinadi.
+-- total_cost ustuni bonding curve bo'yicha xarajat/tushumni saqlaydi (o'zgarmaydi),
+-- commission esa shundan ALOHIDA ushlab qolingan 0.25% miqdorni saqlaydi
+-- (buni 0.1% qismi token yaratuvchisiga, 0.15% qismi muzlatilgan fondga boradi).
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS commission NUMERIC(20, 8) NOT NULL DEFAULT 0;
+
+-- Har bir savdo komissiyasining 0.15% qismi shu yerga - tokenga bog'liq
+-- "muzlatilgan mablag'" fondiga - yig'ilib boriladi. Bu fond faqat ADMIN
+-- tomonidan botni/mini-appni rivojlantirish maqsadida yechib olinishi mumkin
+-- (qarang: src/services/frozenService.ts).
+CREATE TABLE IF NOT EXISTS frozen_balances (
+    token_id INTEGER PRIMARY KEY REFERENCES tokens(id),
+    amount NUMERIC(20, 8) NOT NULL DEFAULT 0,
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- Admin tomonidan muzlatilgan fonddan yechib olingan mablag'lar tarixi
+-- (audit va shaffoflik uchun saqlanadi).
+CREATE TABLE IF NOT EXISTS frozen_withdrawals (
+    id SERIAL PRIMARY KEY,
+    token_id INTEGER NOT NULL REFERENCES tokens(id),
+    amount NUMERIC(20, 8) NOT NULL,
+    admin_user_id INTEGER NOT NULL REFERENCES users(id),
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_frozen_withdrawals_token ON frozen_withdrawals(token_id);
