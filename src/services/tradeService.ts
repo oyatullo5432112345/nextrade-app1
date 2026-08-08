@@ -1,6 +1,7 @@
 import { pool } from "../db/pool";
 import { calculateBuyCost, calculateSellReturn } from "./pricingService";
 import { addFrozenAmount } from "./frozenService";
+import { notifyCreatorCommission } from "../bot/bot";
 
 // Token yaratuvchisi o'z tokenidan max_supply ning 25% igacha, oddiy
 // foydalanuvchilar esa faqat 10% igacha egalik qilishi mumkin (joriy
@@ -94,11 +95,13 @@ export async function buyToken(userId: number, tokenId: number, amount: number) 
     // Komissiyaning 0.1% ulushi token yaratuvchisiga o'tadi (agar yaratuvchi
     // o'zi sotib olayotgan bo'lsa ham qo'shiladi - shunda uning uchun real
     // komissiya effektiv ravishda 0.15% ga teng bo'ladi).
+    let creatorTelegramId: number | null = null;
     if (creatorCommission > 0) {
-      await client.query(
-        "UPDATE users SET nex_trade_balance = nex_trade_balance + $1 WHERE id = $2",
+      const creatorRes = await client.query(
+        "UPDATE users SET nex_trade_balance = nex_trade_balance + $1 WHERE id = $2 RETURNING telegram_id",
         [creatorCommission, token.owner_id]
       );
+      creatorTelegramId = creatorRes.rows[0]?.telegram_id ?? null;
     }
 
     // Komissiyaning 0.15% ulushi muzlatilgan fondga qo'shiladi
@@ -132,6 +135,14 @@ export async function buyToken(userId: number, tokenId: number, amount: number) 
     );
 
     await client.query("COMMIT");
+
+    // Tranzaksiya muvaffaqiyatli yakunlangandan keyingina yaratuvchiga xabar
+    // yuboramiz - shu bilan ROLLBACK bo'lgan savdolar uchun noto'g'ri xabar
+    // ketmaydi. sendMessage tarmoq chaqiruvi tranzaksiyani ushlab turmasligi kerak.
+    if (creatorTelegramId && creatorCommission > 0) {
+      notifyCreatorCommission(creatorTelegramId, token.name, token.symbol, creatorCommission, "buy");
+    }
+
     return { totalCost, commission, totalCharge, newPrice, newSupply };
   } catch (err) {
     await client.query("ROLLBACK");
@@ -197,11 +208,13 @@ export async function sellToken(userId: number, tokenId: number, amount: number)
 
     // Komissiyaning 0.1% ulushi token yaratuvchisiga o'tadi (yaratuvchi o'zi
     // sotayotgan bo'lsa ham qo'shiladi - effektiv komissiya 0.15% bo'ladi).
+    let creatorTelegramId: number | null = null;
     if (creatorCommission > 0) {
-      await client.query(
-        "UPDATE users SET nex_trade_balance = nex_trade_balance + $1 WHERE id = $2",
+      const creatorRes = await client.query(
+        "UPDATE users SET nex_trade_balance = nex_trade_balance + $1 WHERE id = $2 RETURNING telegram_id",
         [creatorCommission, token.owner_id]
       );
+      creatorTelegramId = creatorRes.rows[0]?.telegram_id ?? null;
     }
 
     // Komissiyaning 0.15% ulushi muzlatilgan fondga qo'shiladi
@@ -214,6 +227,14 @@ export async function sellToken(userId: number, tokenId: number, amount: number)
     );
 
     await client.query("COMMIT");
+
+    // Tranzaksiya muvaffaqiyatli yakunlangandan keyingina yaratuvchiga xabar
+    // yuboramiz - shu bilan ROLLBACK bo'lgan savdolar uchun noto'g'ri xabar
+    // ketmaydi. sendMessage tarmoq chaqiruvi tranzaksiyani ushlab turmasligi kerak.
+    if (creatorTelegramId && creatorCommission > 0) {
+      notifyCreatorCommission(creatorTelegramId, token.name, token.symbol, creatorCommission, "sell");
+    }
+
     return { totalReturn: netReturn, grossReturn: totalReturn, commission, newPrice, newSupply };
   } catch (err) {
     await client.query("ROLLBACK");
