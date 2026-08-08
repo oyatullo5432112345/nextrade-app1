@@ -6,13 +6,22 @@
  *
  * Token qancha ko'p sotib olinsa (circulating_supply oshsa), narx ko'tariladi.
  * Token qancha ko'p sotilsa (circulating_supply kamaysa), narx tushadi.
- * Narx faqat foydalanuvchilarning savdo faoliyatiga bog'liq - qo'lda o'zgartirilmaydi.
+ * Bundan tashqari narxga avtomatik tebranish ham ta'sir qiladi (bu fayldagi
+ * ABSOLUTE_MIN_PRICE bilan bir xil pastki chegarani hurmat qiladi, lekin
+ * "priceFluctuationService.ts" faylida amalga oshiriladi).
  *
- * Natija har doim 0.0001 va 0.01 UZS oralig'ida cheklanadi.
+ * MUHIM: bu yerdagi MIN_PRICE/MAX_PRICE faqat token YARATILGANDA tanlanadigan
+ * boshlang'ich narx (base_price) uchun ishlatiladi. Keyingi savdo/tebranish
+ * jarayonida narxga yuqori chegara QO'YILMAYDI - faqat 0 ga tushib
+ * ketmasligi uchun pastki chegara saqlanadi.
  */
 
 const MIN_PRICE = 0.0001;
 const MAX_PRICE = 0.01;
+
+// Savdo/tebranish paytida narx hech qachon bundan pastga tushmaydi.
+// (MIN_PRICE bilan bir xil qiymat, lekin nomi alohida - maqsadi boshqacha)
+export const ABSOLUTE_MIN_PRICE = MIN_PRICE;
 
 export function calculatePrice(
   basePrice: number,
@@ -22,7 +31,8 @@ export function calculatePrice(
 ): number {
   const ratio = circulatingSupply / maxSupply;
   const rawPrice = basePrice * Math.pow(1 + ratio, k);
-  return clamp(rawPrice, MIN_PRICE, MAX_PRICE);
+  // Faqat pastki chegara - yuqori chegara yo'q, narx erkin o'sishi mumkin
+  return Math.max(rawPrice, ABSOLUTE_MIN_PRICE);
 }
 
 /**
@@ -74,10 +84,6 @@ export function calculateSellReturn(
   return { totalReturn, newSupply: Math.max(supply, 0), newPrice };
 }
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max);
-}
-
 /**
  * Token yaratilganda boshlang'ich narxni tanlaydi (0.0001 - 0.01 oralig'ida).
  * Nom asosida deterministik "omad" hosil qilinadi - shu bilan bir xil nomdagi
@@ -90,4 +96,4 @@ export function generateInitialPrice(symbol: string): number {
   }
   const fraction = (hash % 10000) / 10000; // 0..1 oralig'ida
   return MIN_PRICE + fraction * (MAX_PRICE - MIN_PRICE);
-}
+  }
