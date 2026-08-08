@@ -196,6 +196,17 @@
     background:var(--bg-elevated); border:1px solid var(--border); border-radius:10px;
     padding:10px 12px; font-size:12px; color:var(--muted); word-break:break-all; margin-top:8px;
   }
+  .daily-bonus-box{
+    background:var(--card); border:1px solid var(--border); border-radius:14px;
+    padding:14px; margin-top:12px; width:100%; display:flex; align-items:center; justify-content:space-between; gap:10px;
+  }
+  .daily-bonus-btn{
+    background:var(--gold); color:#1a1200; border:none; border-radius:10px;
+    padding:10px 16px; font-weight:700; font-size:13px; white-space:nowrap; cursor:pointer;
+  }
+  .daily-bonus-btn:disabled{
+    background:var(--bg-elevated); color:var(--muted); cursor:default;
+  }
 
   /* Token tafsilot ekrani */
   .detail-overlay{
@@ -302,6 +313,13 @@
           <div class="stat-num" id="stat-referrals">0</div>
           <div class="stat-label">Taklif qilingan</div>
         </div>
+      </div>
+      <div class="daily-bonus-box">
+        <div>
+          <div style="font-weight:600;font-size:13.5px;">🎁 Kunlik bonus</div>
+          <div class="hint" id="daily-bonus-hint">Har 24 soatda bepul Nex Trade oling</div>
+        </div>
+        <button class="daily-bonus-btn" id="daily-bonus-btn">Olish</button>
       </div>
       <div class="referral-box">
         <div style="font-weight:600;font-size:13.5px;">👥 Do'stlarni taklif qiling</div>
@@ -484,6 +502,22 @@
     linkEl.onclick = ()=>{
       navigator.clipboard?.writeText(refLink);
       toast("Havola nusxalandi!");
+    };
+
+    const bonusBtn = document.getElementById("daily-bonus-btn");
+    bonusBtn.onclick = async ()=>{
+      bonusBtn.disabled = true;
+      try{
+        const res = await api(`/user/${currentUser.id}/daily-bonus`, { method: "POST" });
+        currentUser.nex_trade_balance = res.newBalance;
+        document.getElementById("stat-balance").textContent = fmt(res.newBalance);
+        document.getElementById("daily-bonus-hint").textContent = `+${res.bonus} Nex Trade olindi! Ertaga qayta keling.`;
+        toast(`🎁 +${res.bonus} Nex Trade qo'shildi!`);
+      }catch(e){
+        document.getElementById("daily-bonus-hint").textContent = e.message;
+        bonusBtn.disabled = false;
+        toast(e.message);
+      }
     };
 
     try{
