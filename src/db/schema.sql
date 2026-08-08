@@ -61,3 +61,6 @@ CREATE INDEX IF NOT EXISTS idx_price_ticks_token ON price_ticks(token_id);
 -- va tranzaksiya narxi endi erkin o'sishi mumkin).
 ALTER TABLE tokens ALTER COLUMN current_price TYPE NUMERIC(20, 8);
 ALTER TABLE transactions ALTER COLUMN price TYPE NUMERIC(20, 8);
+
+-- Kunlik bonus oxirgi marta qachon olinganini kuzatish uchun
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_daily_bonus_at TIMESTAMP;
