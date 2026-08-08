@@ -41,7 +41,23 @@ CREATE TABLE IF NOT EXISTS transactions (
     created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
+-- Savdodan mustaqil, har 10 soniyada qo'shiladigan avtomatik narx tebranishlari.
+-- Grafikda savdo tarixi bilan birga ko'rsatiladi.
+CREATE TABLE IF NOT EXISTS price_ticks (
+    id SERIAL PRIMARY KEY,
+    token_id INTEGER NOT NULL REFERENCES tokens(id),
+    price NUMERIC(20, 8) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
 CREATE INDEX IF NOT EXISTS idx_holdings_user ON holdings(user_id);
 CREATE INDEX IF NOT EXISTS idx_holdings_token ON holdings(token_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_token ON transactions(token_id);
 CREATE INDEX IF NOT EXISTS idx_tokens_owner ON tokens(owner_id);
+CREATE INDEX IF NOT EXISTS idx_price_ticks_token ON price_ticks(token_id);
+
+-- Narxga endi yuqori chegara qo'yilmagani uchun ustunlar kengligini oshiramiz
+-- (base_price hamon 0.0001-0.01 oralig'ida cheklangan, faqat current_price
+-- va tranzaksiya narxi endi erkin o'sishi mumkin).
+ALTER TABLE tokens ALTER COLUMN current_price TYPE NUMERIC(20, 8);
+ALTER TABLE transactions ALTER COLUMN price TYPE NUMERIC(20, 8);
