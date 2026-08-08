@@ -1,6 +1,7 @@
 import { Bot, InlineKeyboard } from "grammy";
 import dotenv from "dotenv";
 import { getOrCreateUser, getPlatformStats, getUserLeaderboard, claimDailyBonus } from "../services/userService";
+import { listFrozenBalances, getTotalFrozen, withdrawFrozen } from "../services/frozenService";
 
 dotenv.config();
 
@@ -85,6 +86,59 @@ bot.command("kunlik", async (ctx) => {
     );
   } catch (err: any) {
     await ctx.reply(`⏳ ${err.message}`);
+  }
+});
+
+// Muzlatilgan fond (savdo komissiyasining 0.15% qismi) holatini ko'rish - faqat admin
+bot.command("muzlatilgan", async (ctx) => {
+  const telegramId = ctx.from?.id;
+  if (!telegramId || telegramId !== ADMIN_TELEGRAM_ID) {
+    return;
+  }
+
+  const [balances, total] = await Promise.all([listFrozenBalances(), getTotalFrozen()]);
+
+  if (balances.length === 0) {
+    await ctx.reply("❄️ Hozircha muzlatilgan mablag' yo'q.");
+    return;
+  }
+
+  const lines = balances.map(
+    (b: any) => `• ${b.name} ($${b.symbol}, id:${b.token_id}) — ${Number(b.amount).toFixed(4)} Nex Trade`
+  );
+
+  await ctx.reply(
+    `❄️ Muzlatilgan mablag'lar (bot/mini-app rivojlantirish fondi)\n\n${lines.join("\n")}\n\n` +
+      `💰 Jami: ${total.toFixed(4)} Nex Trade\n\n` +
+      `Yechib olish uchun: /yechish <token_id> <miqdor>`
+  );
+});
+
+// Muzlatilgan fonddan mablag' yechib olish (o'z balansiga o'tadi) - faqat admin
+bot.command("yechish", async (ctx) => {
+  const telegramId = ctx.from?.id;
+  if (!telegramId || telegramId !== ADMIN_TELEGRAM_ID) {
+    return;
+  }
+
+  const args = (typeof ctx.match === "string" ? ctx.match : "").trim().split(/\s+/);
+  const tokenId = Number(args[0]);
+  const amount = Number(args[1]);
+
+  if (!args[0] || !args[1] || !tokenId || !amount || amount <= 0) {
+    await ctx.reply("Format: /yechish <token_id> <miqdor>\nMasalan: /yechish 3 1.5");
+    return;
+  }
+
+  try {
+    const result = await withdrawFrozen(telegramId, tokenId, amount);
+    await ctx.reply(
+      `✅ ${amount} Nex Trade muzlatilgan fonddan yechib olindi.\n` +
+        `❄️ Ushbu tokenda qolgan muzlatilgan mablag': ${result.newFrozenBalance.toFixed(4)}\n` +
+        `💰 Yangilangan balansingiz: ${Number(result.adminNewBalance).toFixed(4)} Nex Trade`
+    );
+  } catch (err: any) {
+    await ctx.reply(`⚠️ ${err.message}`);
   }
 });
 
