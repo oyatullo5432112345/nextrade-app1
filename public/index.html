@@ -20,6 +20,17 @@
     --down: #FF5C72;
     --radius: 16px;
   }
+  html[data-theme="light"]{
+    --bg: #F5F6FA;
+    --bg-elevated: #FFFFFF;
+    --card: #FFFFFF;
+    --border: #E4E7EF;
+    --text: #171A22;
+    --muted: #7C8699;
+    --gold: #C9821A;
+    --up: #12A876;
+    --down: #E1435A;
+  }
   *{box-sizing:border-box; margin:0; padding:0;}
   html,body{
     background:var(--bg);
@@ -27,12 +38,20 @@
     font-family:'Inter',sans-serif;
     -webkit-font-smoothing:antialiased;
     min-height:100vh;
+    transition:background .2s, color .2s;
   }
   .num{font-family:'Space Grotesk',sans-serif;}
 
   header.topbar{
     padding:20px 18px 14px;
     display:flex; flex-direction:column; gap:4px;
+    position:relative;
+  }
+  .theme-toggle{
+    position:absolute; top:18px; right:18px;
+    width:38px; height:38px; border-radius:12px;
+    background:var(--card); border:1px solid var(--border);
+    color:var(--text); font-size:17px; display:flex; align-items:center; justify-content:center;
   }
   .eyebrow{
     font-size:12px; letter-spacing:.08em; text-transform:uppercase;
@@ -111,9 +130,57 @@
     background:transparent; color:var(--text); font-weight:600; font-size:15px; margin-top:8px;
   }
 
-  .empty{
-    text-align:center; padding:60px 20px; color:var(--muted); font-size:14px;
+  /* Yuklanmoqda spinneri - tugma bosilganda darhol ko'rinadigan feedback */
+  .spinner{
+    display:inline-block; width:16px; height:16px; margin-right:8px;
+    border:2px solid rgba(0,0,0,.25); border-top-color:currentColor;
+    border-radius:50%; vertical-align:-3px;
+    animation:spin .7s linear infinite;
   }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  button.loading{ opacity:.85; pointer-events:none; }
+
+  .empty{
+    text-align:center; padding:56px 20px; color:var(--muted); font-size:14px;
+  }
+  .empty .empty-icon{ font-size:40px; margin-bottom:12px; opacity:.8; }
+  .empty .empty-title{ font-weight:600; color:var(--text); font-size:14.5px; margin-bottom:4px; }
+  .empty .empty-sub{ font-size:12.5px; line-height:1.5; }
+
+  /* Sevimli token (yulduzcha) */
+  .fav-star{
+    background:none; border:none; font-size:18px; padding:4px 8px;
+    color:var(--muted); flex-shrink:0; line-height:1;
+  }
+  .fav-star.active{ color:var(--gold); }
+
+  /* Portfelda foyda/zarar */
+  .pnl{ font-size:11.5px; font-weight:700; margin-top:4px; }
+  .pnl.pos{ color:var(--up); }
+  .pnl.neg{ color:var(--down); }
+  .pnl.flat{ color:var(--muted); }
+  .portfolio-summary{
+    display:flex; justify-content:space-between; align-items:center;
+    background:var(--card); border:1px solid var(--border); border-radius:var(--radius);
+    padding:14px 16px; margin-bottom:12px;
+  }
+  .portfolio-summary .label{ font-size:12px; color:var(--muted); }
+  .portfolio-summary .value{ font-family:'Space Grotesk',sans-serif; font-size:20px; font-weight:700; margin-top:2px; }
+
+  /* Qidiruv tarixi */
+  .search-history{ display:flex; gap:8px; flex-wrap:wrap; margin:-6px 0 14px; }
+  .search-history.hidden{ display:none; }
+  .search-chip{
+    background:var(--card); border:1px solid var(--border); border-radius:20px;
+    padding:6px 12px; font-size:12px; color:var(--muted); font-weight:600;
+  }
+
+  /* Bildirishnoma qo'ng'irog'i (token tafsilot ekrani) */
+  .bell-btn{
+    width:34px; height:34px; border-radius:10px; background:var(--card);
+    border:1px solid var(--border); color:var(--text); font-size:15px; margin-left:auto;
+  }
+  .bell-btn.active{ color:var(--gold); border-color:var(--gold); }
 
   .modal-backdrop{
     position:fixed; inset:0; background:rgba(0,0,0,.6);
@@ -250,6 +317,7 @@
 <body>
 
 <header class="topbar">
+  <button class="theme-toggle" id="theme-toggle" title="Mavzuni almashtirish">🌙</button>
   <div class="eyebrow">Mening balansim</div>
   <div class="balance-row">
     <span class="balance-num num" id="balance">0</span>
@@ -262,18 +330,29 @@
   <button class="tab-btn" data-tab="portfolio">Portfelim</button>
   <button class="tab-btn" data-tab="create">Yaratish</button>
   <button class="tab-btn" data-tab="profile">Profil</button>
+  <button class="tab-btn" data-tab="admin" id="admin-tab-btn" style="display:none;">Admin</button>
 </nav>
 
 <main>
   <section class="screen active" id="screen-market">
-    <input class="search-box" id="search-input" type="text" placeholder="🔍 Token nomi yoki belgisi bo'yicha qidirish" />
+    <input class="search-box" id="search-input" type="text" placeholder="🔍 Token nomi yoki belgisi bo'yicha qidirish" autocomplete="off" />
+    <div class="search-history hidden" id="search-history"></div>
     <div class="section-title" id="leaderboard-title">Top tokenlar</div>
     <div class="leaderboard" id="leaderboard"></div>
+    <div class="section-title hidden" id="favorites-title" style="display:none;">⭐ Sevimlilar</div>
+    <div class="leaderboard" id="favorites-list"></div>
     <div class="section-title" id="market-list-title">Barcha tokenlar</div>
     <div id="market-list"></div>
   </section>
 
   <section class="screen" id="screen-portfolio">
+    <div class="portfolio-summary" id="portfolio-summary" style="display:none;">
+      <div>
+        <div class="label">Umumiy foyda/zarar</div>
+        <div class="value num" id="portfolio-pnl-value">0 UZS</div>
+      </div>
+      <div class="pnl" id="portfolio-pnl-pct" style="font-size:15px;">0%</div>
+    </div>
     <div id="portfolio-list"></div>
   </section>
 
@@ -291,6 +370,7 @@
         <label>Maksimal miqdor (max 10 000)</label>
         <input id="new-supply" type="number" placeholder="10000" max="10000" min="1" />
         <div class="hint">Narx boshlang'ich holatda 0.0001–0.01 UZS oralig'ida avtomatik belgilanadi va faqat foydalanuvchilarning savdo faoliyatiga qarab o'zgaradi.</div>
+        <div class="hint">💰 Tokeningiz bilan qilingan har bir savdodan sizga <b>0.1%</b> bonus tushadi. O'zingiz esa tokeningizning maksimal <b>25%</b> igacha qismiga egalik qila olasiz (boshqa foydalanuvchilar uchun bu chegara 10%).</div>
       </div>
       <button class="primary" id="create-btn">Token yaratish</button>
     </div>
@@ -330,6 +410,34 @@
     <div class="section-title">Mening tokenlarim</div>
     <div id="my-tokens-list"></div>
   </section>
+
+  <section class="screen" id="screen-admin">
+    <div class="card">
+      <div style="font-weight:700;font-size:15px;margin-bottom:4px;">❄️ Muzlatilgan mablag' fondi</div>
+      <div class="hint">Har bir savdo komissiyasining 0.15% qismi shu yerga yig'iladi. Faqat siz (admin) botni/mini-appni rivojlantirish uchun bu yerdan yechib olishingiz mumkin.</div>
+      <div style="margin-top:14px;">
+        <div class="label">Jami muzlatilgan</div>
+        <div class="value num" id="admin-frozen-total" style="font-size:22px;font-weight:700;">0 Nex Trade</div>
+      </div>
+    </div>
+
+    <div class="section-title">Token bo'yicha taqsimot</div>
+    <div id="admin-frozen-list"></div>
+
+    <div class="section-title">Yechib olish</div>
+    <div class="card">
+      <div class="field">
+        <label>Token ID</label>
+        <input id="admin-withdraw-token-id" type="number" placeholder="Masalan: 3" min="1" />
+      </div>
+      <div class="field">
+        <label>Miqdor</label>
+        <input id="admin-withdraw-amount" type="number" placeholder="0" min="0" step="0.0001" />
+      </div>
+      <button class="primary" id="admin-withdraw-btn">Yechib olish</button>
+      <div class="hint">Yechilgan mablag' to'g'ridan-to'g'ri sizning Nex Trade balansingizga o'tkaziladi.</div>
+    </div>
+  </section>
 </main>
 
 <div id="toast"></div>
@@ -346,6 +454,7 @@
       <label>Miqdor</label>
       <input id="trade-amount" type="number" placeholder="0" min="0" />
     </div>
+    <div class="hint">ℹ️ Tranzaksiyadan <b>0.25%</b> komissiya olinadi (shundan <b>0.1%</b> token yaratuvchisiga bonus sifatida beriladi).</div>
     <button class="primary" id="trade-confirm">Tasdiqlash</button>
     <button class="ghost" id="trade-cancel">Bekor qilish</button>
   </div>
@@ -358,6 +467,8 @@
       <div id="detail-name" style="font-weight:700;font-size:15px;">—</div>
       <div class="detail-meta" id="detail-symbol">—</div>
     </div>
+    <button class="fav-star" id="detail-fav" style="font-size:22px;">☆</button>
+    <button class="bell-btn" id="detail-bell" title="Narx bildirishnomasi">🔔</button>
   </div>
   <div class="detail-body">
     <div class="detail-price-big num" id="detail-price">0.0000</div>
@@ -385,6 +496,8 @@
   let selectedTokenId = null;
   let tradeSide = "buy";
   let detailRefreshInterval = null;
+  let favoriteIds = new Set();
+  let alertedTokenIds = new Set();
 
   function toast(msg){
     const t = document.getElementById("toast");
@@ -397,6 +510,18 @@
     return Number(n).toLocaleString("uz-UZ", { maximumFractionDigits: 4 });
   }
 
+  // ====== MAVZU (DARK/LIGHT) ======
+  function applyTheme(theme){
+    document.documentElement.setAttribute("data-theme", theme);
+    document.getElementById("theme-toggle").textContent = theme === "light" ? "☀️" : "🌙";
+    localStorage.setItem("nextrade-theme", theme);
+  }
+  applyTheme(localStorage.getItem("nextrade-theme") || "dark");
+  document.getElementById("theme-toggle").addEventListener("click", ()=>{
+    const current = document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light";
+    applyTheme(current);
+  });
+
   // Tab almashtirish
   document.querySelectorAll(".tab-btn").forEach(btn=>{
     btn.addEventListener("click", ()=>{
@@ -406,17 +531,116 @@
       document.getElementById("screen-"+btn.dataset.tab).classList.add("active");
       if(btn.dataset.tab === "portfolio") loadPortfolio();
       if(btn.dataset.tab === "profile") loadProfile();
+      if(btn.dataset.tab === "admin") loadAdminFrozen();
     });
   });
 
+  // Faqat admin (ADMIN_TELEGRAM_ID) uchun "Admin" bo'limini ko'rsatadi.
+  // Backend /api/admin/frozen so'rovi 403 qaytarsa, tab yashirin qoladi.
+  let isAdmin = false;
+  async function checkAdminAccess(){
+    try{
+      await api(`/admin/frozen?admin_telegram_id=${currentUser.telegram_id}`);
+      isAdmin = true;
+      document.getElementById("admin-tab-btn").style.display = "";
+    }catch(e){
+      isAdmin = false;
+    }
+  }
+
+  function fmtFrozen(n){ return Number(n).toLocaleString("uz-UZ", { maximumFractionDigits: 4 }); }
+
+  async function loadAdminFrozen(){
+    if(!isAdmin) return;
+    try{
+      const data = await api(`/admin/frozen?admin_telegram_id=${currentUser.telegram_id}`);
+      document.getElementById("admin-frozen-total").textContent = `${fmtFrozen(data.total)} Nex Trade`;
+
+      const list = document.getElementById("admin-frozen-list");
+      if(!data.balances.length){
+        list.innerHTML = `<div class="empty">
+          <div class="empty-icon">❄️</div>
+          <div class="empty-title">Hozircha muzlatilgan mablag' yo'q</div>
+        </div>`;
+        return;
+      }
+      list.innerHTML = data.balances.map(b => `
+        <div class="market-row">
+          <div>
+            <div style="font-weight:600;">${b.name} <span style="color:var(--muted);">$${b.symbol}</span></div>
+            <div class="hint" style="margin-top:2px;">Token ID: ${b.token_id}</div>
+          </div>
+          <div class="num" style="font-weight:700;">${fmtFrozen(b.amount)}</div>
+        </div>`).join("");
+    }catch(e){ toast(friendlyError(e)); }
+  }
+
+  document.getElementById("admin-withdraw-btn").addEventListener("click", async ()=>{
+    const tokenId = Number(document.getElementById("admin-withdraw-token-id").value);
+    const amount = Number(document.getElementById("admin-withdraw-amount").value);
+    if(!tokenId || !amount || amount <= 0){ toast("Token ID va miqdorni to'g'ri kiriting"); return; }
+
+    const btn = document.getElementById("admin-withdraw-btn");
+    const restore = setLoading(btn, "Yechilmoqda...");
+    try{
+      await api("/admin/frozen/withdraw", {
+        method: "POST",
+        body: JSON.stringify({ admin_telegram_id: currentUser.telegram_id, token_id: tokenId, amount })
+      });
+      toast("Mablag' yechib olindi!");
+      document.getElementById("admin-withdraw-token-id").value = "";
+      document.getElementById("admin-withdraw-amount").value = "";
+      const refreshed = await api("/user/init", {
+        method: "POST",
+        body: JSON.stringify({ telegram_id: currentUser.telegram_id, username: currentUser.username })
+      });
+      currentUser.nex_trade_balance = refreshed.nex_trade_balance;
+      document.getElementById("balance").textContent = fmt(currentUser.nex_trade_balance);
+      await loadAdminFrozen();
+    }catch(e){ toast(friendlyError(e)); }
+    finally{ restore(); }
+  });
+
+  // Foydalanuvchiga tushunarli xato xabarlari - texnik/tarmoq xatolarini
+  // o'qilishi qiyin bo'lgan xom matn o'rniga oddiy uzbekcha jumlaga aylantiradi.
+  function friendlyError(err){
+    if(!navigator.onLine) return "Internet aloqasi yo'q. Ulanishni tekshiring";
+    if(err instanceof TypeError) return "Serverga ulanib bo'lmadi. Birozdan so'ng qayta urinib ko'ring";
+    if(err && err.message) return err.message;
+    return "Kutilmagan xatolik yuz berdi";
+  }
+
   async function api(path, opts={}){
-    const res = await fetch(API_BASE + path, {
-      headers: { "Content-Type": "application/json" },
-      ...opts
-    });
-    const data = await res.json();
+    let res;
+    try{
+      res = await fetch(API_BASE + path, {
+        headers: { "Content-Type": "application/json" },
+        ...opts
+      });
+    }catch(networkErr){
+      throw new Error(friendlyError(networkErr));
+    }
+    let data;
+    try{
+      data = await res.json();
+    }catch(parseErr){
+      throw new Error("Server javobi noto'g'ri formatda. Birozdan so'ng qayta urinib ko'ring");
+    }
     if(!res.ok) throw new Error(data.error || "Xatolik yuz berdi");
     return data;
+  }
+
+  // Tugmani "yuklanmoqda" holatiga o'tkazadi va asl matnini qaytarish uchun funksiya beradi
+  function setLoading(btn, loadingText){
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.classList.add("loading");
+    btn.innerHTML = `<span class="spinner"></span>${loadingText}`;
+    return () => {
+      btn.disabled = false;
+      btn.classList.remove("loading");
+      btn.innerHTML = original;
+    };
   }
 
   async function initUser(){
@@ -437,6 +661,11 @@
       body: JSON.stringify({ telegram_id: telegramId, username, referrer_telegram_id: referrerTelegramId })
     });
     document.getElementById("balance").textContent = fmt(currentUser.nex_trade_balance);
+
+    try{
+      const ids = await api(`/user/${currentUser.id}/favorites/ids`);
+      favoriteIds = new Set(ids);
+    }catch(e){ /* jim */ }
   }
 
   function tokenBadgeLetters(symbol){
@@ -446,13 +675,30 @@
   function renderMarket(tokens){
     const list = document.getElementById("market-list");
     if(!tokens.length){
-      list.innerHTML = `<div class="empty">Hozircha tokenlar yo'q.<br>Birinchi bo'lib o'zingiznikini yarating!</div>`;
+      list.innerHTML = `<div class="empty">
+        <div class="empty-icon">🪙</div>
+        <div class="empty-title">Hali token yo'q</div>
+        <div class="empty-sub">Birinchi bo'lib o'zingiznikini yarating!</div>
+      </div>`;
       return;
     }
-    list.innerHTML = tokens.map(t=>{
-      const fillPct = Math.min(100, (Number(t.circulating_supply)/Number(t.max_supply))*100);
-      return `
+    list.innerHTML = tokens.map(t=> tokenRowHtml(t)).join("");
+
+    list.querySelectorAll(".token-row").forEach(row=>{
+      row.addEventListener("click", (e)=>{
+        if(e.target.closest(".fav-star")) return;
+        openTokenDetail(row.dataset);
+      });
+    });
+    bindFavStars(list);
+  }
+
+  function tokenRowHtml(t){
+    const fillPct = Math.min(100, (Number(t.circulating_supply)/Number(t.max_supply))*100);
+    const isFav = favoriteIds.has(t.id);
+    return `
       <div class="token-row" data-id="${t.id}" data-name="${t.name}" data-symbol="${t.symbol}" data-price="${t.current_price}">
+        <button class="fav-star ${isFav ? "active" : ""}" data-fav-id="${t.id}">${isFav ? "★" : "☆"}</button>
         <div class="token-badge">${tokenBadgeLetters(t.symbol)}</div>
         <div class="token-info">
           <div class="token-name">${t.name}</div>
@@ -463,11 +709,58 @@
           <div class="fill"><i style="width:${fillPct}%"></i></div>
         </div>
       </div>`;
-    }).join("");
+  }
 
-    list.querySelectorAll(".token-row").forEach(row=>{
-      row.addEventListener("click", ()=> openTokenDetail(row.dataset));
+  function bindFavStars(container){
+    container.querySelectorAll(".fav-star").forEach(star=>{
+      star.addEventListener("click", async (e)=>{
+        e.stopPropagation();
+        const tokenId = Number(star.dataset.favId);
+        try{
+          const result = await api("/favorites/toggle", {
+            method:"POST",
+            body: JSON.stringify({ user_id: currentUser.id, token_id: tokenId })
+          });
+          if(result.favorited) favoriteIds.add(tokenId); else favoriteIds.delete(tokenId);
+          document.querySelectorAll(`.fav-star[data-fav-id="${tokenId}"]`).forEach(s=>{
+            s.classList.toggle("active", result.favorited);
+            s.textContent = result.favorited ? "★" : "☆";
+          });
+          loadFavorites();
+        }catch(e){ toast(e.message); }
+      });
     });
+  }
+
+  function renderFavorites(){
+    const titleEl = document.getElementById("favorites-title");
+    const wrap = document.getElementById("favorites-list");
+    if(!favoriteIds.size){
+      titleEl.style.display = "none";
+      wrap.style.display = "none";
+      return;
+    }
+    titleEl.style.display = "block";
+    wrap.style.display = "flex";
+  }
+
+  async function loadFavorites(){
+    if(!favoriteIds.size){ renderFavorites(); return; }
+    try{
+      const tokens = await api(`/user/${currentUser.id}/favorites`);
+      const wrap = document.getElementById("favorites-list");
+      wrap.innerHTML = tokens.map((t,i)=>`
+        <div class="lb-card" data-id="${t.id}" data-name="${t.name}" data-symbol="${t.symbol}" data-price="${t.current_price}">
+          <div class="lb-badge">${tokenBadgeLetters(t.symbol)}</div>
+          <div class="lb-name">${t.name}</div>
+          <div class="lb-price num">${Number(t.current_price).toFixed(4)}</div>
+        </div>
+      `).join("");
+      wrap.querySelectorAll(".lb-card").forEach(card=>{
+        card.addEventListener("click", ()=> openTokenDetail(card.dataset));
+      });
+      renderFavorites();
+    }catch(e){ /* jim */ }
   }
 
   async function loadMarket(query){
@@ -480,12 +773,50 @@
       const isSearching = Boolean(query && query.trim());
       document.getElementById("leaderboard").style.display = isSearching ? "none" : "flex";
       document.getElementById("leaderboard-title").style.display = isSearching ? "none" : "block";
+      document.getElementById("favorites-title").style.display = (isSearching || !favoriteIds.size) ? "none" : "block";
+      document.getElementById("favorites-list").style.display = (isSearching || !favoriteIds.size) ? "none" : "flex";
       document.getElementById("market-list-title").textContent = isSearching ? "Qidiruv natijalari" : "Barcha tokenlar";
-    }catch(e){ toast(e.message); }
+
+      if(isSearching) saveSearchHistory(query.trim());
+    }catch(e){ toast(friendlyError(e)); }
   }
+
+  // ====== QIDIRUV TARIXI ======
+  function getSearchHistory(){
+    try{ return JSON.parse(localStorage.getItem("nextrade-search-history") || "[]"); }
+    catch(e){ return []; }
+  }
+  function saveSearchHistory(term){
+    let history = getSearchHistory().filter(t=> t.toLowerCase() !== term.toLowerCase());
+    history.unshift(term);
+    history = history.slice(0, 6);
+    localStorage.setItem("nextrade-search-history", JSON.stringify(history));
+  }
+  function renderSearchHistory(){
+    const wrap = document.getElementById("search-history");
+    const history = getSearchHistory();
+    if(!history.length){ wrap.classList.add("hidden"); wrap.innerHTML = ""; return; }
+    wrap.classList.remove("hidden");
+    wrap.innerHTML = history.map(term=> `<button class="search-chip" data-term="${term}">🕘 ${term}</button>`).join("");
+    wrap.querySelectorAll(".search-chip").forEach(chip=>{
+      chip.addEventListener("click", ()=>{
+        const input = document.getElementById("search-input");
+        input.value = chip.dataset.term;
+        wrap.classList.add("hidden");
+        loadMarket(chip.dataset.term);
+      });
+    });
+  }
+  document.getElementById("search-input").addEventListener("focus", ()=>{
+    if(!document.getElementById("search-input").value.trim()) renderSearchHistory();
+  });
+  document.getElementById("search-input").addEventListener("blur", ()=>{
+    setTimeout(()=> document.getElementById("search-history").classList.add("hidden"), 150);
+  });
 
   let searchTimeout;
   document.getElementById("search-input").addEventListener("input", (e)=>{
+    document.getElementById("search-history").classList.add("hidden");
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(()=> loadMarket(e.target.value), 350);
   });
@@ -506,17 +837,19 @@
 
     const bonusBtn = document.getElementById("daily-bonus-btn");
     bonusBtn.onclick = async ()=>{
-      bonusBtn.disabled = true;
+      const restore = setLoading(bonusBtn, "");
       try{
         const res = await api(`/user/${currentUser.id}/daily-bonus`, { method: "POST" });
         currentUser.nex_trade_balance = res.newBalance;
         document.getElementById("stat-balance").textContent = fmt(res.newBalance);
         document.getElementById("daily-bonus-hint").textContent = `+${res.bonus} Nex Trade olindi! Ertaga qayta keling.`;
         toast(`🎁 +${res.bonus} Nex Trade qo'shildi!`);
+        restore();
+        bonusBtn.disabled = true;
       }catch(e){
-        document.getElementById("daily-bonus-hint").textContent = e.message;
-        bonusBtn.disabled = false;
-        toast(e.message);
+        document.getElementById("daily-bonus-hint").textContent = friendlyError(e);
+        restore();
+        toast(friendlyError(e));
       }
     };
 
@@ -530,28 +863,22 @@
 
       const list = document.getElementById("my-tokens-list");
       if(!myTokens.length){
-        list.innerHTML = `<div class="empty">Hali token yaratmagansiz.<br>"Yaratish" bo'limidan boshlang!</div>`;
+        list.innerHTML = `<div class="empty">
+          <div class="empty-icon">🛠️</div>
+          <div class="empty-title">Hali token yaratmagansiz</div>
+          <div class="empty-sub">"Yaratish" bo'limidan boshlang!</div>
+        </div>`;
       } else {
-        list.innerHTML = myTokens.map(t=>{
-          const fillPct = Math.min(100, (Number(t.circulating_supply)/Number(t.max_supply))*100);
-          return `
-          <div class="token-row" data-id="${t.id}" data-name="${t.name}" data-symbol="${t.symbol}" data-price="${t.current_price}">
-            <div class="token-badge">${tokenBadgeLetters(t.symbol)}</div>
-            <div class="token-info">
-              <div class="token-name">${t.name}</div>
-              <div class="token-sub">$${t.symbol} · ${fmt(t.circulating_supply)}/${fmt(t.max_supply)}</div>
-            </div>
-            <div class="token-price">
-              <div class="p num">${Number(t.current_price).toFixed(4)}</div>
-              <div class="fill"><i style="width:${fillPct}%"></i></div>
-            </div>
-          </div>`;
-        }).join("");
+        list.innerHTML = myTokens.map(t=> tokenRowHtml(t)).join("");
         list.querySelectorAll(".token-row").forEach(row=>{
-          row.addEventListener("click", ()=> openTokenDetail(row.dataset));
+          row.addEventListener("click", (e)=>{
+            if(e.target.closest(".fav-star")) return;
+            openTokenDetail(row.dataset);
+          });
         });
+        bindFavStars(list);
       }
-    }catch(e){ toast(e.message); }
+    }catch(e){ toast(friendlyError(e)); }
   }
 
   function renderLeaderboard(tokens){
@@ -580,15 +907,40 @@
     }catch(e){ /* jim */ }
   }
 
+  function pnlBadge(pct){
+    const cls = pct > 0.01 ? "pos" : pct < -0.01 ? "neg" : "flat";
+    const sign = pct > 0 ? "+" : "";
+    return `<div class="pnl ${cls}">${sign}${pct.toFixed(1)}%</div>`;
+  }
+
   async function loadPortfolio(){
     const list = document.getElementById("portfolio-list");
+    const summary = document.getElementById("portfolio-summary");
     try{
       const holdings = await api(`/user/${currentUser.id}/holdings`);
       if(!holdings.length){
-        list.innerHTML = `<div class="empty">Portfelingiz bo'sh.<br>Bozordan token sotib oling.</div>`;
+        summary.style.display = "none";
+        list.innerHTML = `<div class="empty">
+          <div class="empty-icon">📦</div>
+          <div class="empty-title">Portfelingiz bo'sh</div>
+          <div class="empty-sub">Bozordan token sotib oling.</div>
+        </div>`;
         return;
       }
-      list.innerHTML = holdings.map(h=>`
+
+      let totalCost = 0, totalValue = 0;
+
+      list.innerHTML = holdings.map(h=>{
+        const amount = Number(h.amount);
+        const avgCost = Number(h.avg_cost);
+        const currentPrice = Number(h.current_price);
+        const cost = avgCost * amount;
+        const value = currentPrice * amount;
+        totalCost += cost;
+        totalValue += value;
+        const pct = cost > 0 ? ((value - cost) / cost) * 100 : 0;
+
+        return `
         <div class="token-row" data-id="${h.token_id}" data-name="${h.name}" data-symbol="${h.symbol}" data-price="${h.current_price}">
           <div class="token-badge">${tokenBadgeLetters(h.symbol)}</div>
           <div class="token-info">
@@ -596,14 +948,31 @@
             <div class="token-sub">${fmt(h.amount)} ta token</div>
           </div>
           <div class="token-price">
-            <div class="p num">${Number(h.current_price).toFixed(4)}</div>
+            <div class="p num">${currentPrice.toFixed(4)}</div>
+            ${cost > 0 ? pnlBadge(pct) : ""}
           </div>
         </div>
-      `).join("");
+      `;
+      }).join("");
+
       list.querySelectorAll(".token-row").forEach(row=>{
         row.addEventListener("click", ()=> openTokenDetail(row.dataset));
       });
-    }catch(e){ toast(e.message); }
+
+      if(totalCost > 0){
+        const totalPct = ((totalValue - totalCost) / totalCost) * 100;
+        const diff = totalValue - totalCost;
+        summary.style.display = "flex";
+        const valueEl = document.getElementById("portfolio-pnl-value");
+        const pctEl = document.getElementById("portfolio-pnl-pct");
+        valueEl.textContent = `${diff >= 0 ? "+" : ""}${fmt(diff)} UZS`;
+        valueEl.style.color = diff >= 0 ? "var(--up)" : "var(--down)";
+        pctEl.textContent = `${totalPct >= 0 ? "+" : ""}${totalPct.toFixed(1)}%`;
+        pctEl.className = "pnl " + (totalPct > 0.01 ? "pos" : totalPct < -0.01 ? "neg" : "flat");
+      } else {
+        summary.style.display = "none";
+      }
+    }catch(e){ toast(friendlyError(e)); }
   }
 
   // ====== TOKEN TAFSILOT EKRANI (grafik + tarix) ======
@@ -624,11 +993,18 @@
   }
 
   async function openTokenDetail(data){
-    selectedTokenId = data.id;
+    selectedTokenId = Number(data.id);
     document.getElementById("detail-name").textContent = data.name;
     document.getElementById("detail-symbol").textContent = "$" + data.symbol;
     document.getElementById("detail-price").textContent = Number(data.price).toFixed(4);
     document.getElementById("detail-overlay").classList.add("active");
+
+    const favBtn = document.getElementById("detail-fav");
+    const isFav = favoriteIds.has(selectedTokenId);
+    favBtn.textContent = isFav ? "★" : "☆";
+    favBtn.classList.toggle("active", isFav);
+
+    refreshAlertState(selectedTokenId);
 
     await refreshTokenDetail(data.id);
 
@@ -636,6 +1012,55 @@
     if(detailRefreshInterval) clearInterval(detailRefreshInterval);
     detailRefreshInterval = setInterval(()=> refreshTokenDetail(selectedTokenId), 10000);
   }
+
+  document.getElementById("detail-fav").addEventListener("click", async ()=>{
+    const btn = document.getElementById("detail-fav");
+    try{
+      const result = await api("/favorites/toggle", {
+        method:"POST",
+        body: JSON.stringify({ user_id: currentUser.id, token_id: selectedTokenId })
+      });
+      if(result.favorited) favoriteIds.add(selectedTokenId); else favoriteIds.delete(selectedTokenId);
+      btn.textContent = result.favorited ? "★" : "☆";
+      btn.classList.toggle("active", result.favorited);
+      loadFavorites();
+    }catch(e){ toast(friendlyError(e)); }
+  });
+
+  // ====== BILDIRISHNOMA (narx uchun obuna) ======
+  async function refreshAlertState(tokenId){
+    const bellBtn = document.getElementById("detail-bell");
+    try{
+      const alerts = await api(`/user/${currentUser.id}/alerts`);
+      const isSubscribed = alerts.some(a => a.token_id === tokenId);
+      bellBtn.classList.toggle("active", isSubscribed);
+      bellBtn.textContent = isSubscribed ? "🔔" : "🔕";
+    }catch(e){ /* jim */ }
+  }
+
+  document.getElementById("detail-bell").addEventListener("click", async ()=>{
+    const bellBtn = document.getElementById("detail-bell");
+    const isSubscribed = bellBtn.classList.contains("active");
+    try{
+      if(isSubscribed){
+        await api("/alerts", {
+          method:"DELETE",
+          body: JSON.stringify({ user_id: currentUser.id, token_id: selectedTokenId })
+        });
+        bellBtn.classList.remove("active");
+        bellBtn.textContent = "🔕";
+        toast("Bildirishnoma o'chirildi");
+      } else {
+        await api("/alerts", {
+          method:"POST",
+          body: JSON.stringify({ user_id: currentUser.id, token_id: selectedTokenId, threshold_pct: 5 })
+        });
+        bellBtn.classList.add("active");
+        bellBtn.textContent = "🔔";
+        toast("Narx 5% o'zgarsa, botdan xabar olasiz");
+      }
+    }catch(e){ toast(friendlyError(e)); }
+  });
 
   document.getElementById("detail-back").addEventListener("click", ()=>{
     document.getElementById("detail-overlay").classList.remove("active");
@@ -686,10 +1111,16 @@
       return [x,y];
     });
 
+    // Narx boshidan oxirigacha o'sgan bo'lsa yashil, tushgan bo'lsa qizil rangda chiziladi
+    const trendUp = prices[prices.length - 1] >= prices[0];
+    const lineColor = trendUp ? "#00D68F" : "#FF5C72";
+    const fillColorTop = trendUp ? "rgba(0,214,143,.22)" : "rgba(255,92,114,.22)";
+    const fillColorBottom = trendUp ? "rgba(0,214,143,0)" : "rgba(255,92,114,0)";
+
     // Gradient ostki maydon
     const grad = ctx.createLinearGradient(0,0,0,h);
-    grad.addColorStop(0, "rgba(255,200,87,.25)");
-    grad.addColorStop(1, "rgba(255,200,87,0)");
+    grad.addColorStop(0, fillColorTop);
+    grad.addColorStop(1, fillColorBottom);
     ctx.beginPath();
     ctx.moveTo(points[0][0], h);
     points.forEach(([x,y])=>ctx.lineTo(x,y));
@@ -701,16 +1132,21 @@
     // Chiziq
     ctx.beginPath();
     points.forEach(([x,y],i)=> i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y));
-    ctx.strokeStyle = "#FFC857";
+    ctx.strokeStyle = lineColor;
     ctx.lineWidth = 2;
     ctx.lineJoin = "round";
     ctx.stroke();
+
+    document.getElementById("detail-price").style.color = trendUp ? "var(--up)" : "var(--down)";
   }
 
   function renderHistoryList(history){
     const wrap = document.getElementById("history-list");
     if(!history.length){
-      wrap.innerHTML = `<div class="empty">Hali savdo bo'lmagan</div>`;
+      wrap.innerHTML = `<div class="empty">
+        <div class="empty-icon">📊</div>
+        <div class="empty-title">Hali savdo bo'lmagan</div>
+      </div>`;
       return;
     }
     wrap.innerHTML = history.slice().reverse().map(h=>{
@@ -754,6 +1190,8 @@
   document.getElementById("trade-confirm").addEventListener("click", async ()=>{
     const amount = Number(document.getElementById("trade-amount").value);
     if(!amount || amount <= 0){ toast("Miqdorni kiriting"); return; }
+    const btn = document.getElementById("trade-confirm");
+    const restore = setLoading(btn, tradeSide === "buy" ? "Sotib olinmoqda..." : "Sotilmoqda...");
     try{
       const endpoint = tradeSide === "buy" ? "/trade/buy" : "/trade/sell";
       const result = await api(endpoint, {
@@ -765,10 +1203,12 @@
       await initUser();
       await loadMarket();
       await loadLeaderboard();
+      await loadFavorites();
       if(document.getElementById("detail-overlay").classList.contains("active")){
         await refreshTokenDetail(selectedTokenId);
       }
-    }catch(e){ toast(e.message); }
+    }catch(e){ toast(friendlyError(e)); }
+    finally{ restore(); }
   });
 
   document.getElementById("create-btn").addEventListener("click", async ()=>{
@@ -776,6 +1216,8 @@
     const symbol = document.getElementById("new-symbol").value.trim();
     const supply = Number(document.getElementById("new-supply").value);
     if(!name || !symbol || !supply){ toast("Hamma maydonlarni to'ldiring"); return; }
+    const btn = document.getElementById("create-btn");
+    const restore = setLoading(btn, "Yaratilmoqda...");
     try{
       await api("/tokens", {
         method:"POST",
@@ -787,14 +1229,21 @@
       document.getElementById("new-supply").value = "";
       document.querySelector('[data-tab="market"]').click();
       await loadMarket();
-    }catch(e){ toast(e.message); }
+    }catch(e){ toast(friendlyError(e)); }
+    finally{ restore(); }
   });
 
   (async function start(){
-    await initUser();
-    await loadMarket();
-    await loadLeaderboard();
+    try{
+      await initUser();
+      await checkAdminAccess();
+      await loadMarket();
+      await loadLeaderboard();
+      await loadFavorites();
+    }catch(e){
+      toast(friendlyError(e));
+    }
   })();
 </script>
 </body>
-                                                                                   </html>
+</html>
