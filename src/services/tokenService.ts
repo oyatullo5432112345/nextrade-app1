@@ -55,14 +55,57 @@ export async function listLeaderboard(limit = 5) {
 }
 
 /**
- * Bitta tokenning so'nggi savdo tarixi - narx grafigi va tranzaksiyalar
- * ro'yxati uchun ishlatiladi.
+ * Foydalanuvchi o'zi yaratgan barcha tokenlar (profil sahifasi uchun).
+ */
+export async function getTokensByOwner(ownerId: number) {
+  const result = await pool.query(
+    `SELECT * FROM tokens WHERE owner_id = $1 ORDER BY created_at DESC`,
+    [ownerId]
+  );
+  return result.rows;
+}
+
+/**
+ * Nom yoki belgi bo'yicha token qidirish.
+ */
+export async function searchTokens(query: string, limit = 20) {
+  const result = await pool.query(
+    `SELECT * FROM tokens
+     WHERE name ILIKE $1 OR symbol ILIKE $1
+     ORDER BY current_price DESC LIMIT $2`,
+    [`%${query}%`, limit]
+  );
+  return result.rows;
+}
+
+/**
+ * Bitta tokenning so'nggi SAVDO tarixi (faqat buy/sell) - "Savdo tarixi"
+ * ro'yxati uchun ishlatiladi. Avtomatik narx tebranishlari bu yerga kirmaydi.
  */
 export async function getTokenHistory(tokenId: number, limit = 50) {
   const result = await pool.query(
     `SELECT type, amount, price, total_cost, created_at
      FROM transactions
      WHERE token_id = $1
+     ORDER BY created_at DESC
+     LIMIT $2`,
+    [tokenId, limit]
+  );
+  return result.rows.reverse(); // eskidan yangiga tartib - grafik uchun qulay
+}
+
+/**
+ * Narx GRAFIGI uchun ma'lumot - savdolar (buy/sell) va avtomatik narx
+ * tebranishlari birlashtirilib, vaqt bo'yicha tartiblanadi. Shu tufayli
+ * grafik hech kim savdo qilmasa ham har 10 soniyada yangilanib turadi.
+ */
+export async function getTokenChartData(tokenId: number, limit = 100) {
+  const result = await pool.query(
+    `SELECT price, created_at FROM (
+       SELECT price, created_at FROM transactions WHERE token_id = $1
+       UNION ALL
+       SELECT price, created_at FROM price_ticks WHERE token_id = $1
+     ) combined
      ORDER BY created_at DESC
      LIMIT $2`,
     [tokenId, limit]
