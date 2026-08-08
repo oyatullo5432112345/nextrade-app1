@@ -1,6 +1,6 @@
 import { Bot, InlineKeyboard } from "grammy";
 import dotenv from "dotenv";
-import { getOrCreateUser, getPlatformStats } from "../services/userService";
+import { getOrCreateUser, getPlatformStats, getUserLeaderboard, claimDailyBonus } from "../services/userService";
 
 dotenv.config();
 
@@ -52,6 +52,40 @@ bot.command("referral", async (ctx) => {
       `Har bir yangi do'stingiz ushbu havola orqali qo'shilganda, ikkalangizga ham qo'shimcha bonus beriladi.\n\n` +
       `Sizning shaxsiy havolangiz:\n${link}`
   );
+});
+
+bot.command("reyting", async (ctx) => {
+  const top = await getUserLeaderboard(10);
+  if (top.length === 0) {
+    await ctx.reply("Hozircha reytingda hech kim yo'q.");
+    return;
+  }
+
+  const medals = ["🥇", "🥈", "🥉"];
+  const lines = top.map((u, i) => {
+    const medal = medals[i] ?? `${i + 1}.`;
+    const name = u.username ? `@${u.username}` : `Foydalanuvchi #${u.id}`;
+    return `${medal} ${name} — ${Number(u.nex_trade_balance).toFixed(2)} Nex Trade`;
+  });
+
+  await ctx.reply(`🏆 Eng boy foydalanuvchilar reytingi\n\n${lines.join("\n")}`);
+});
+
+bot.command("kunlik", async (ctx) => {
+  const telegramId = ctx.from?.id;
+  if (!telegramId) return;
+
+  const user = await getOrCreateUser(telegramId, ctx.from?.username);
+
+  try {
+    const result = await claimDailyBonus(user.id);
+    await ctx.reply(
+      `🎁 Kunlik bonus olindi: +${result.bonus} Nex Trade!\n` +
+        `💰 Yangi balans: ${Number(result.newBalance).toFixed(2)} Nex Trade`
+    );
+  } catch (err: any) {
+    await ctx.reply(`⏳ ${err.message}`);
+  }
 });
 
 bot.catch((err) => {
