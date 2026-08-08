@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { getOrCreateUser, getUserHoldings, getReferralCount } from "../services/userService";
+import { getOrCreateUser, getUserHoldings, getReferralCount, getUserLeaderboard, claimDailyBonus } from "../services/userService";
 import {
   createToken,
   getToken,
@@ -51,6 +51,16 @@ apiRouter.get("/user/:userId/holdings", async (req, res) => {
   res.json(holdings);
 });
 
+// Kunlik bonusni olish (24 soatda bir marta)
+apiRouter.post("/user/:userId/daily-bonus", async (req, res) => {
+  try {
+    const result = await claimDailyBonus(Number(req.params.userId));
+    res.json(result);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // Yangi token yaratish
 apiRouter.post("/tokens", async (req, res) => {
   const schema = z.object({
@@ -92,6 +102,12 @@ apiRouter.get("/tokens/:id", async (req, res) => {
 apiRouter.get("/leaderboard", async (_req, res) => {
   const tokens = await listLeaderboard();
   res.json(tokens);
+});
+
+// Eng ko'p Nex Trade balansiga ega foydalanuvchilar reytingi
+apiRouter.get("/leaderboard/users", async (_req, res) => {
+  const users = await getUserLeaderboard();
+  res.json(users);
 });
 
 // Bitta tokenning savdo tarixi (faqat "Savdo tarixi" ro'yxati uchun)
