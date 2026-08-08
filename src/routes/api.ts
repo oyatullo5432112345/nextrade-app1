@@ -1,12 +1,15 @@
 import { Router } from "express";
 import { z } from "zod";
-import { getOrCreateUser, getUserHoldings } from "../services/userService";
+import { getOrCreateUser, getUserHoldings, getReferralCount } from "../services/userService";
 import {
   createToken,
   getToken,
   listTopTokens,
   listLeaderboard,
   getTokenHistory,
+  getTokenChartData,
+  getTokensByOwner,
+  searchTokens,
 } from "../services/tokenService";
 import { buyToken, sellToken } from "../services/tradeService";
 
@@ -17,12 +20,29 @@ apiRouter.post("/user/init", async (req, res) => {
   const schema = z.object({
     telegram_id: z.number(),
     username: z.string().optional(),
+    referrer_telegram_id: z.number().optional(),
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.message });
 
-  const user = await getOrCreateUser(parsed.data.telegram_id, parsed.data.username);
+  const user = await getOrCreateUser(
+    parsed.data.telegram_id,
+    parsed.data.username,
+    parsed.data.referrer_telegram_id
+  );
   res.json(user);
+});
+
+// Foydalanuvchining profil ma'lumotlari: nechta odam taklif qilgani
+apiRouter.get("/user/:userId/referrals", async (req, res) => {
+  const count = await getReferralCount(Number(req.params.userId));
+  res.json({ count });
+});
+
+// Foydalanuvchi o'zi yaratgan tokenlar (profil sahifasi)
+apiRouter.get("/user/:userId/created-tokens", async (req, res) => {
+  const tokens = await getTokensByOwner(Number(req.params.userId));
+  res.json(tokens);
 });
 
 // Foydalanuvchi tokenlari (portfel)
@@ -56,8 +76,9 @@ apiRouter.post("/tokens", async (req, res) => {
 });
 
 // Top tokenlar ro'yxati (bozor)
-apiRouter.get("/tokens", async (_req, res) => {
-  const tokens = await listTopTokens();
+apiRouter.get("/tokens", async (req, res) => {
+  const q = req.query.q as string | undefined;
+  const tokens = q && q.trim() ? await searchTokens(q.trim()) : await listTopTokens();
   res.json(tokens);
 });
 
@@ -73,10 +94,16 @@ apiRouter.get("/leaderboard", async (_req, res) => {
   res.json(tokens);
 });
 
-// Bitta tokenning savdo tarixi (grafik va ro'yxat uchun)
+// Bitta tokenning savdo tarixi (faqat "Savdo tarixi" ro'yxati uchun)
 apiRouter.get("/tokens/:id/history", async (req, res) => {
   const history = await getTokenHistory(Number(req.params.id));
   res.json(history);
+});
+
+// Narx grafigi uchun - savdolar + avtomatik tebranishlar birga
+apiRouter.get("/tokens/:id/chart", async (req, res) => {
+  const chart = await getTokenChartData(Number(req.params.id));
+  res.json(chart);
 });
 
 // Sotib olish
