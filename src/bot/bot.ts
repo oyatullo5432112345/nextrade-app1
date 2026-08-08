@@ -146,6 +146,35 @@ bot.catch((err) => {
   console.error("Bot xatosi:", err);
 });
 
+/**
+ * Token yaratuvchisiga, uning tokenidan savdo (sotib olish/sotish) bo'lganda
+ * ulushiga qo'shilgan komissiya haqida Telegram orqali xabar yuboradi.
+ *
+ * tradeService.ts dagi buyToken/sellToken funksiyalari tranzaksiya muvaffaqiyatli
+ * COMMIT bo'lgandan keyin shu funksiyani chaqiradi. Xabar yuborish xatoga uchrasa
+ * (masalan, foydalanuvchi botni bloklagan bo'lsa) bu savdo natijasiga ta'sir
+ * qilmasligi kerak - shuning uchun xato shu yerning o'zida ushlanadi.
+ */
+export async function notifyCreatorCommission(
+  creatorTelegramId: number,
+  tokenName: string,
+  tokenSymbol: string,
+  commissionAmount: number,
+  tradeType: "buy" | "sell"
+): Promise<void> {
+  const actionLabel = tradeType === "buy" ? "sotib olindi" : "sotildi";
+  try {
+    await bot.api.sendMessage(
+      creatorTelegramId,
+      `💰 Sizga komissiya qo'shildi!\n\n` +
+        `${tokenName} ($${tokenSymbol}) tokeningizdan ${actionLabel}.\n` +
+        `Balansingizga +${commissionAmount.toFixed(4)} Nex Trade qo'shildi.`
+    );
+  } catch (err) {
+    console.error("⚠️ Yaratuvchiga komissiya xabarini yuborib bo'lmadi:", err);
+  }
+}
+
 bot.command("stats", async (ctx) => {
   const telegramId = ctx.from?.id;
   if (!telegramId || telegramId !== ADMIN_TELEGRAM_ID) {
