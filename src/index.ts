@@ -3,6 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import { apiRouter } from "./routes/api";
 import { bot } from "./bot/bot";
+import { startPriceFluctuations } from "./services/priceFluctuationService";
 
 dotenv.config();
 
@@ -19,3 +20,5 @@ app.listen(PORT, () => {
 
 bot.start();
 console.log("✅ Telegram bot ishga tushdi");
+
+startPriceFluctuations();
