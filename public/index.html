@@ -506,7 +506,12 @@
         <span class="hint" style="margin:0;">Taxminiy UZS qiymati</span>
         <span class="num" id="trade-preview-uzs" style="color:var(--muted);">—</span>
       </div>
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:6px;">
+        <span class="hint" style="margin:0;">Komissiya (0.25%)</span>
+        <span class="num" id="trade-preview-fee" style="color:var(--down);">—</span>
+      </div>
     </div>
+    <div id="trade-preview-error" class="hint" style="display:none;color:var(--down);"></div>
     <div class="hint">ℹ️ Tranzaksiyadan <b>0.25%</b> komissiya olinadi (shundan <b>0.1%</b> token yaratuvchisiga bonus sifatida beriladi).</div>
     <button class="primary" id="trade-confirm">Tasdiqlash</button>
     <button class="ghost" id="trade-cancel">Bekor qilish</button>
@@ -1402,6 +1407,7 @@
     document.getElementById("modal-token-price").textContent = `Joriy narx: ${Number(data.price).toFixed(4)} UZS`;
     document.getElementById("trade-amount").value = "";
     document.getElementById("trade-preview-box").style.display = "none";
+    document.getElementById("trade-preview-error").style.display = "none";
     document.getElementById("trade-modal").classList.add("active");
   }
 
@@ -1422,7 +1428,12 @@
   async function updateTradePreview(){
     const amount = Number(document.getElementById("trade-amount").value);
     const box = document.getElementById("trade-preview-box");
-    if(!amount || amount <= 0){ box.style.display = "none"; return; }
+    const errBox = document.getElementById("trade-preview-error");
+    if(!amount || amount <= 0){
+      box.style.display = "none";
+      errBox.style.display = "none";
+      return;
+    }
 
     try{
       const [quote, nexUzsPrice] = await Promise.all([
@@ -1431,12 +1442,18 @@
       ]);
       const nexAmount = Number(quote.nexAmount);
       const uzsAmount = nexAmount * nexUzsPrice;
+      const feeAmount = nexAmount * 0.0025;
 
       document.getElementById("trade-preview-nex").textContent = `${fmt(nexAmount)} Nex Trade`;
       document.getElementById("trade-preview-uzs").textContent = `≈ ${fmt(uzsAmount)} so'm`;
+      document.getElementById("trade-preview-fee").textContent = `${fmt(feeAmount)} Nex Trade`;
       box.style.display = "block";
+      errBox.style.display = "none";
     }catch(e){
+      // Xatoni endi yashirmaymiz - foydalanuvchiga aynan nima sabab ekanini ko'rsatamiz
       box.style.display = "none";
+      errBox.textContent = "⚠️ " + friendlyError(e);
+      errBox.style.display = "block";
     }
   }
 
