@@ -1,5 +1,5 @@
 import { pool } from "../db/pool";
-import { generateInitialPrice, calculatePrice } from "./pricingService";
+import { generateInitialPrice, calculatePrice, calculateBuyCost, calculateSellReturn } from "./pricingService";
 import { recordBalanceSnapshot } from "./balanceHistoryService";
 
 const DEFAULT_CURVE_K = 1.5;
@@ -31,6 +31,36 @@ export async function createToken(
 export async function getToken(tokenId: number) {
   const result = await pool.query("SELECT * FROM tokens WHERE id = $1", [tokenId]);
   return result.rows[0] ?? null;
+}
+
+/**
+ * Foydalanuvchi savdo miqdorini kiritayotganda, hali tasdiqlamasdan turib
+ * "shuncha token = shuncha Nex Trade" narxini oldindan ko'rsatish uchun.
+ * Haqiqiy savdo bilan bir xil bonding-curve formulasidan foydalanadi,
+ * shuning uchun ko'rsatilgan narx bilan haqiqiy narx deyarli bir xil bo'ladi
+ * (faqat shu oraliqda boshqa savdo bo'lib, supply o'zgargan bo'lsa farq qilishi mumkin).
+ */
+export async function getTradeQuote(tokenId: number, side: "buy" | "sell", amount: number) {
+  if (amount <= 0) throw new Error("Miqdor musbat bo'lishi kerak");
+
+  const token = await getToken(tokenId);
+  if (!token) throw new Error("Token topilmadi");
+
+  const basePrice = Number(token.base_price);
+  const supply = Number(token.circulating_supply);
+  const maxSupply = Number(token.max_supply);
+  const k = Number(token.curve_k);
+
+  if (side === "buy") {
+    if (supply + amount > maxSupply) {
+      throw new Error("Bu miqdor maksimal muomaladagi hajmdan oshib ketadi");
+    }
+    const { totalCost, newPrice } = calculateBuyCost(basePrice, supply, maxSupply, k, amount);
+    return { nexAmount: totalCost, newPrice, avgPrice: totalCost / amount };
+  } else {
+    const { totalReturn, newPrice } = calculateSellReturn(basePrice, supply, maxSupply, k, amount);
+    return { nexAmount: totalReturn, newPrice, avgPrice: totalReturn / amount };
+  }
 }
 
 export async function listTopTokens(limit = 20) {
@@ -201,3 +231,57 @@ export async function boostToken(tokenId: number, userId: number, amount: number
     client.release();
   }
 }
+
+// PRO nishoni narxi (Nex Trade da) - bu real pulga aloqasi yo'q, ichki
+// valyutadan sarflanadi va faqat token profilida "✅ PRO" belgisi chiqishiga sabab bo'ladi.
+const PRO_BADGE_COST = 500;
+
+export async function upgradeTokenToPro(tokenId: number, userId: number) {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const tokenRes = await client.query("SELECT * FROM tokens WHERE id = $1 FOR UPDATE", [tokenId]);
+    if (tokenRes.rows.length === 0) throw new Error("Token topilmadi");
+    const token = tokenRes.rows[0];
+
+    if (Number(token.owner_id) !== userId) {
+      throw new Error("Faqat token yaratuvchisi PRO holatiga o'tkaza oladi");
+    }
+    if (token.is_pro) {
+      throw new Error("Bu token allaqachon PRO");
+    }
+
+    const userRes = await client.query("SELECT * FROM users WHERE id = $1 FOR UPDATE", [userId]);
+    if (userRes.rows.length === 0) throw new Error("Foydalanuvchi topilmadi");
+    const user = userRes.rows[0];
+
+    if (Number(user.nex_trade_balance) < PRO_BADGE_COST) {
+      throw new Error(`PRO nishon uchun ${PRO_BADGE_COST} Nex Trade kerak, balansingizda yetarli mablag' yo'q`);
+    }
+
+    const userUpdate = await client.query(
+      "UPDATE users SET nex_trade_balance = nex_trade_balance - $1 WHERE id = $2 RETURNING nex_trade_balance",
+      [PRO_BADGE_COST, userId]
+    );
+    await recordBalanceSnapshot(userId, userUpdate.rows[0].nex_trade_balance, client);
+
+    const updated = await client.query(
+      "UPDATE tokens SET is_pro = true, pro_since = NOW() WHERE id = $1 RETURNING *",
+      [tokenId]
+    );
+
+    await client.query("COMMIT");
+    return updated.rows[0];
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+export function getProBadgeCost() {
+  return PRO_BADGE_COST;
+}
+
