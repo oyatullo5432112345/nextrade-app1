@@ -1,4 +1,5 @@
 import { pool } from "../db/pool";
+import { recordBalanceSnapshot } from "./balanceHistoryService";
 
 // .env faylida INITIAL_BALANCE, REFERRAL_BONUS, DAILY_BONUS orqali sozlash mumkin
 const INITIAL_NEX_TRADE_BALANCE = Number(process.env.INITIAL_BALANCE ?? 10);
@@ -44,10 +45,11 @@ export async function getOrCreateUser(
       );
       if (referrer.rows.length > 0) {
         referrerId = referrer.rows[0].id;
-        await client.query(
-          "UPDATE users SET nex_trade_balance = nex_trade_balance + $1 WHERE id = $2",
+        const referrerRes = await client.query(
+          "UPDATE users SET nex_trade_balance = nex_trade_balance + $1 WHERE id = $2 RETURNING nex_trade_balance",
           [REFERRAL_BONUS, referrerId]
         );
+        await recordBalanceSnapshot(referrerId, referrerRes.rows[0].nex_trade_balance, client);
       }
     }
 
@@ -59,6 +61,7 @@ export async function getOrCreateUser(
        VALUES ($1, $2, $3, $4) RETURNING *`,
       [telegramId, username ?? null, initialBalance, referrerId]
     );
+    await recordBalanceSnapshot(created.rows[0].id, created.rows[0].nex_trade_balance, client);
 
     await client.query("COMMIT");
     return created.rows[0];
@@ -106,6 +109,7 @@ export async function claimDailyBonus(
     );
 
     await client.query("COMMIT");
+    await recordBalanceSnapshot(userId, updated.rows[0].nex_trade_balance);
     return { newBalance: updated.rows[0].nex_trade_balance, bonus: DAILY_BONUS };
   } catch (err) {
     await client.query("ROLLBACK");
@@ -117,7 +121,7 @@ export async function claimDailyBonus(
 
 export async function getUserHoldings(userId: number) {
   const result = await pool.query(
-    `SELECT h.token_id, t.name, t.symbol, h.amount, t.current_price
+    `SELECT h.token_id, t.name, t.symbol, t.image_url, h.amount, t.current_price
      FROM holdings h
      JOIN tokens t ON t.id = h.token_id
      WHERE h.user_id = $1 AND h.amount > 0`,
