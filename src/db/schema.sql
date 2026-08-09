@@ -163,3 +163,16 @@ CREATE TABLE IF NOT EXISTS token_boosts (
     created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_token_boosts_token ON token_boosts(token_id);
+
+-- MUHIM TUZATISH: base_price ustuni hali ham eski CHECK (<= 0.01) chegarasini
+-- va tor NUMERIC(10,8) turini saqlab turgan edi. Shu sabab "kuchaytirish" (boost)
+-- funksiyasi bazaga yozishda har doim xato berayotgan edi, chunki base_price
+-- boost natijasida 0.01 dan oshib ketishi tabiiy holat. Endi bu chegara olib
+-- tashlanadi va ustun current_price kabi keng turga o'tkaziladi.
+ALTER TABLE tokens DROP CONSTRAINT IF EXISTS tokens_base_price_check;
+ALTER TABLE tokens ALTER COLUMN base_price TYPE NUMERIC(20, 8);
+
+-- PRO NISHON: bu real pulga aloqasi yo'q, faqat ichki Nex Trade sarflab
+-- tokenni "tasdiqlangan/PRO" deb belgilash - reklama/nishon maqsadida.
+ALTER TABLE tokens ADD COLUMN IF NOT EXISTS is_pro BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE tokens ADD COLUMN IF NOT EXISTS pro_since TIMESTAMP;
