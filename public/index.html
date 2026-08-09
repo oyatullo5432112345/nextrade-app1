@@ -96,6 +96,11 @@
   }
   .token-info{ flex:1; min-width:0; }
   .token-name{ font-weight:600; font-size:14.5px; }
+  .pro-tag{
+    display:inline-block; background:linear-gradient(135deg,#FFC857,#FF8A5C);
+    color:#1A1200; font-size:9.5px; font-weight:800; padding:2px 6px;
+    border-radius:6px; letter-spacing:.03em; vertical-align:middle; margin-left:4px;
+  }
   .token-sub{ color:var(--muted); font-size:12px; margin-top:2px; }
   .token-spark{ width:64px; height:28px; flex-shrink:0; }
   .token-price{ text-align:right; flex-shrink:0; }
@@ -492,6 +497,16 @@
       <label>Miqdor</label>
       <input id="trade-amount" type="number" placeholder="0" min="0" />
     </div>
+    <div class="card" id="trade-preview-box" style="display:none;padding:12px;margin-bottom:0;">
+      <div style="display:flex;justify-content:space-between;font-size:13px;">
+        <span class="hint" style="margin:0;">Kerak bo'ladigan Nex Trade</span>
+        <span class="num" id="trade-preview-nex" style="font-weight:700;">—</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:6px;">
+        <span class="hint" style="margin:0;">Taxminiy UZS qiymati</span>
+        <span class="num" id="trade-preview-uzs" style="color:var(--muted);">—</span>
+      </div>
+    </div>
     <div class="hint">ℹ️ Tranzaksiyadan <b>0.25%</b> komissiya olinadi (shundan <b>0.1%</b> token yaratuvchisiga bonus sifatida beriladi).</div>
     <button class="primary" id="trade-confirm">Tasdiqlash</button>
     <button class="ghost" id="trade-cancel">Bekor qilish</button>
@@ -524,6 +539,11 @@
         <input id="boost-amount" type="number" placeholder="Miqdor (Nex Trade)" min="0.0001" step="0.0001" />
       </div>
       <button class="primary" id="boost-btn">Kiritish va narxni oshirish</button>
+    </div>
+    <div class="card" id="detail-pro-card" style="display:none;margin-top:14px;">
+      <div style="font-weight:700;margin-bottom:4px;">✅ PRO nishon</div>
+      <div class="hint" id="detail-pro-hint" style="margin:0 0 10px;">Tokeningizni "PRO" (tasdiqlangan) deb belgilang - bozorda va reytingda alohida ajralib turadi.</div>
+      <button class="primary" id="pro-upgrade-btn">PRO holatiga o'tkazish</button>
     </div>
     <div class="section-title">Savdo tarixi</div>
     <div id="history-list"></div>
@@ -766,12 +786,13 @@
   function tokenRowHtml(t){
     const fillPct = Math.min(100, (Number(t.circulating_supply)/Number(t.max_supply))*100);
     const isFav = favoriteIds.has(t.id);
+    const proTag = t.is_pro ? `<span class="pro-tag">✅ PRO</span>` : "";
     return `
       <div class="token-row" data-id="${t.id}" data-name="${t.name}" data-symbol="${t.symbol}" data-price="${t.current_price}">
         <button class="fav-star ${isFav ? "active" : ""}" data-fav-id="${t.id}">${isFav ? "★" : "☆"}</button>
         ${tokenBadgeHtml(t)}
         <div class="token-info">
-          <div class="token-name">${t.name}</div>
+          <div class="token-name">${t.name} ${proTag}</div>
           <div class="token-sub">$${t.symbol} · ${fmt(t.circulating_supply)}/${fmt(t.max_supply)}</div>
         </div>
         <div class="token-price">
@@ -1072,6 +1093,17 @@
       const boostCard = document.getElementById("detail-boost-card");
       boostCard.style.display = (currentUser && Number(token.owner_id) === currentUser.id) ? "block" : "none";
 
+      const proCard = document.getElementById("detail-pro-card");
+      const isOwner = currentUser && Number(token.owner_id) === currentUser.id;
+      if(isOwner && !token.is_pro){
+        proCard.style.display = "block";
+        const cost = await getProBadgeCost();
+        document.getElementById("detail-pro-hint").textContent =
+          `Tokeningizni "PRO" (tasdiqlangan) deb belgilang - bozorda va reytingda alohida ajralib turadi. Narxi: ${fmt(cost)} Nex Trade (balansingizdan yechiladi).`;
+      } else {
+        proCard.style.display = "none";
+      }
+
       const [chart, history] = await Promise.all([
         api(`/tokens/${tokenId}/chart`),
         api(`/tokens/${tokenId}/history`)
@@ -1117,6 +1149,33 @@
       currentUser = await api("/user/init", { method:"POST", body: JSON.stringify({ telegram_id: currentUser.telegram_id, username: currentUser.username }) });
       document.getElementById("balance").textContent = fmt(currentUser.nex_trade_balance);
       await refreshTokenDetail(selectedTokenId);
+    }catch(e){ toast(friendlyError(e)); }
+    finally{ restore(); }
+  });
+
+  let cachedProBadgeCost = null;
+  async function getProBadgeCost(){
+    if(cachedProBadgeCost !== null) return cachedProBadgeCost;
+    try{
+      const res = await api("/pro-badge-cost");
+      cachedProBadgeCost = Number(res.cost);
+    }catch{ cachedProBadgeCost = 500; }
+    return cachedProBadgeCost;
+  }
+
+  document.getElementById("pro-upgrade-btn").addEventListener("click", async ()=>{
+    const btn = document.getElementById("pro-upgrade-btn");
+    const restore = setLoading(btn, "O'tkazilmoqda...");
+    try{
+      await api(`/tokens/${selectedTokenId}/pro-upgrade`, {
+        method:"POST",
+        body: JSON.stringify({ user_id: currentUser.id })
+      });
+      toast("✅ Token PRO holatiga o'tkazildi!");
+      currentUser = await api("/user/init", { method:"POST", body: JSON.stringify({ telegram_id: currentUser.telegram_id, username: currentUser.username }) });
+      document.getElementById("balance").textContent = fmt(currentUser.nex_trade_balance);
+      await refreshTokenDetail(selectedTokenId);
+      await loadMarket();
     }catch(e){ toast(friendlyError(e)); }
     finally{ restore(); }
   });
@@ -1342,8 +1401,49 @@
     document.getElementById("modal-token-name").textContent = `${data.name} · $${data.symbol}`;
     document.getElementById("modal-token-price").textContent = `Joriy narx: ${Number(data.price).toFixed(4)} UZS`;
     document.getElementById("trade-amount").value = "";
+    document.getElementById("trade-preview-box").style.display = "none";
     document.getElementById("trade-modal").classList.add("active");
   }
+
+  let tradeQuoteTimeout;
+  let cachedNexTradePrice = null;
+
+  async function getNexTradeUzsPrice(){
+    if(cachedNexTradePrice !== null) return cachedNexTradePrice;
+    try{
+      const res = await api("/nextrade/price");
+      cachedNexTradePrice = Number(res.price);
+    }catch{
+      cachedNexTradePrice = 1; // agar olib bo'lmasa - taxminiy 1:1
+    }
+    return cachedNexTradePrice;
+  }
+
+  async function updateTradePreview(){
+    const amount = Number(document.getElementById("trade-amount").value);
+    const box = document.getElementById("trade-preview-box");
+    if(!amount || amount <= 0){ box.style.display = "none"; return; }
+
+    try{
+      const [quote, nexUzsPrice] = await Promise.all([
+        api(`/tokens/${selectedTokenId}/quote?side=${tradeSide}&amount=${amount}`),
+        getNexTradeUzsPrice()
+      ]);
+      const nexAmount = Number(quote.nexAmount);
+      const uzsAmount = nexAmount * nexUzsPrice;
+
+      document.getElementById("trade-preview-nex").textContent = `${fmt(nexAmount)} Nex Trade`;
+      document.getElementById("trade-preview-uzs").textContent = `≈ ${fmt(uzsAmount)} so'm`;
+      box.style.display = "block";
+    }catch(e){
+      box.style.display = "none";
+    }
+  }
+
+  document.getElementById("trade-amount").addEventListener("input", ()=>{
+    clearTimeout(tradeQuoteTimeout);
+    tradeQuoteTimeout = setTimeout(updateTradePreview, 300);
+  });
 
   document.getElementById("trade-cancel").addEventListener("click", ()=>{
     document.getElementById("trade-modal").classList.remove("active");
@@ -1354,6 +1454,7 @@
       document.querySelectorAll(".buysell-toggle button").forEach(b=>b.classList.remove("active"));
       btn.classList.add("active");
       tradeSide = btn.dataset.side;
+      updateTradePreview();
     });
   });
 
