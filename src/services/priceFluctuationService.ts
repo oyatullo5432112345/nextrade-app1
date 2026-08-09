@@ -1,5 +1,6 @@
 import { pool } from "../db/pool";
 import { ABSOLUTE_MIN_PRICE } from "./pricingService";
+import { tickNexTradePrice } from "./nexTradePriceService";
 
 /**
  * Har TICK_INTERVAL_MS millisekundda barcha tokenlar narxiga kichik,
@@ -13,6 +14,11 @@ import { ABSOLUTE_MIN_PRICE } from "./pricingService";
 
 const TICK_INTERVAL_MS = 10_000; // 10 soniya
 const MAX_TICK_CHANGE = 0.02; // bitta tikda maksimal ±2% tasodifiy o'zgarish
+
+// Nex Trade - platformaning ASOSIY valyutasi, shuning uchun tokenlarga
+// nisbatan ancha barqarorroq tebranadi (±0.5%), xuddi real fiat/stabelkoin
+// kabi asta-sekin ko'payib-kamayib turadi.
+const NEX_TRADE_MAX_TICK_CHANGE = 0.005;
 
 let intervalHandle: ReturnType<typeof setInterval> | null = null;
 
@@ -46,6 +52,14 @@ async function tickAllTokens() {
     console.error("❌ Avtomatik narx tebranishida xatolik:", err);
   } finally {
     client.release();
+  }
+
+  // Nex Trade'ning o'z narxi (UZS) - tokenlardan mustaqil, alohida jadvalda
+  // saqlanadi, shuning uchun alohida ulanish (client) bilan yangilanadi.
+  try {
+    await tickNexTradePrice(NEX_TRADE_MAX_TICK_CHANGE);
+  } catch (err) {
+    console.error("❌ Nex Trade narx tebranishida xatolik:", err);
   }
 }
 
