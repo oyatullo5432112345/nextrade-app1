@@ -12,6 +12,9 @@ import {
   getTokensByOwner,
   searchTokens,
   boostToken,
+  getTradeQuote,
+  upgradeTokenToPro,
+  getProBadgeCost,
 } from "../services/tokenService";
 import { buyToken, sellToken } from "../services/tradeService";
 import { getFavoriteTokens, getFavoriteTokenIds, toggleFavorite } from "../services/favoriteService";
@@ -130,6 +133,26 @@ apiRouter.post("/tokens/:id/boost", ah(async (req, res) => {
   }
 }));
 
+// PRO nishoni narxini bilish uchun (frontendda tugma matnida ko'rsatish uchun)
+apiRouter.get("/pro-badge-cost", (_req, res) => {
+  res.json({ cost: getProBadgeCost() });
+});
+
+// Token egasi ichki Nex Trade sarflab tokenini "PRO" (tasdiqlangan) deb belgilaydi.
+// Bu faqat reklama/nishon maqsadida - real pulga aloqasi yo'q.
+apiRouter.post("/tokens/:id/pro-upgrade", ah(async (req, res) => {
+  const schema = z.object({ user_id: z.number() });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "user_id kerak" });
+
+  try {
+    const token = await upgradeTokenToPro(Number(req.params.id), parsed.data.user_id);
+    res.json(token);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+}));
+
 // Top tokenlar ro'yxati (bozor)
 apiRouter.get("/tokens", ah(async (req, res) => {
   const q = req.query.q as string | undefined;
@@ -141,6 +164,20 @@ apiRouter.get("/tokens/:id", ah(async (req, res) => {
   const token = await getToken(Number(req.params.id));
   if (!token) return res.status(404).json({ error: "Token topilmadi" });
   res.json(token);
+}));
+
+// Savdo tugmasini bosishdan oldin: "shuncha token = shuncha Nex Trade" oldindan ko'rsatish
+apiRouter.get("/tokens/:id/quote", ah(async (req, res) => {
+  const side = req.query.side === "sell" ? "sell" : "buy";
+  const amount = Number(req.query.amount);
+  if (!amount || amount <= 0) return res.status(400).json({ error: "Miqdorni kiriting" });
+
+  try {
+    const quote = await getTradeQuote(Number(req.params.id), side, amount);
+    res.json(quote);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
 }));
 
 // Bozor qiymati bo'yicha eng yuqori tokenlar (reyting)
