@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import { getOrCreateUser, getUserHoldings, getReferralCount, getUserLeaderboard, claimDailyBonus } from "../services/userService";
+import { getBalanceHistory } from "../services/balanceHistoryService";
 import {
   createToken,
   getToken,
@@ -10,11 +11,13 @@ import {
   getTokenChartData,
   getTokensByOwner,
   searchTokens,
+  boostToken,
 } from "../services/tokenService";
 import { buyToken, sellToken } from "../services/tradeService";
 import { getFavoriteTokens, getFavoriteTokenIds, toggleFavorite } from "../services/favoriteService";
 import { getUserAlerts, subscribeAlert, unsubscribeAlert } from "../services/alertService";
 import { listFrozenBalances, getTotalFrozen, withdrawFrozen } from "../services/frozenService";
+import { getNexTradePrice, getNexTradePriceChart } from "../services/nexTradePriceService";
 
 export const apiRouter = Router();
 
@@ -74,6 +77,12 @@ apiRouter.post("/user/:userId/daily-bonus", ah(async (req, res) => {
   }
 }));
 
+// Foydalanuvchi balansining vaqt bo'yicha tarixi (Portfolio grafigi uchun)
+apiRouter.get("/user/:userId/balance-history", ah(async (req, res) => {
+  const history = await getBalanceHistory(Number(req.params.userId));
+  res.json(history);
+}));
+
 // Yangi token yaratish
 apiRouter.post("/tokens", ah(async (req, res) => {
   const schema = z.object({
@@ -81,6 +90,7 @@ apiRouter.post("/tokens", ah(async (req, res) => {
     name: z.string().min(1).max(64),
     symbol: z.string().min(1).max(16),
     max_supply: z.number().positive().max(10000),
+    image_url: z.string().url().max(1000).optional(),
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Hamma maydonlarni to'g'ri to'ldiring" });
@@ -90,13 +100,32 @@ apiRouter.post("/tokens", ah(async (req, res) => {
       parsed.data.owner_id,
       parsed.data.name,
       parsed.data.symbol,
-      parsed.data.max_supply
+      parsed.data.max_supply,
+      parsed.data.image_url
     );
     res.json(token);
   } catch (err: any) {
     if (err.code === "23505") {
       return res.status(400).json({ error: "Bu belgi (symbol) allaqachon band. Boshqasini tanlang" });
     }
+    res.status(400).json({ error: err.message });
+  }
+}));
+
+// Token egasi o'z Nex Trade'idan tokeniga mablag' kiritib, narxini
+// qaytarilmas tarzda oshiradi ("boost")
+apiRouter.post("/tokens/:id/boost", ah(async (req, res) => {
+  const schema = z.object({
+    user_id: z.number(),
+    amount: z.number().positive(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Miqdorni to'g'ri kiriting" });
+
+  try {
+    const result = await boostToken(Number(req.params.id), parsed.data.user_id, parsed.data.amount);
+    res.json(result);
+  } catch (err: any) {
     res.status(400).json({ error: err.message });
   }
 }));
@@ -291,3 +320,19 @@ apiRouter.post("/admin/frozen/withdraw", ah(async (req, res) => {
 apiRouter.get("/ping", (_req, res) => {
   res.json({ ok: true, time: new Date().toISOString() });
 });
+
+// ====== NEX TRADE (ASOSIY VALYUTA) NARXI ======
+// 1 Nex Trade ning real (UZS) qiymati - boshlang'ich 0.9957 UZS, bozorga
+// qarab (avtomatik tebranish orqali) ko'payadi/kamayadi.
+
+// Hozirgi narx
+apiRouter.get("/nextrade/price", ah(async (_req, res) => {
+  const price = await getNexTradePrice();
+  res.json(price);
+}));
+
+// Narx grafigi (tarix)
+apiRouter.get("/nextrade/chart", ah(async (_req, res) => {
+  const chart = await getNexTradePriceChart();
+  res.json(chart);
+}));
