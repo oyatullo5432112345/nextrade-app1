@@ -323,6 +323,9 @@
     <span class="balance-num num" id="balance">0</span>
     <span class="balance-unit">Nex Trade</span>
   </div>
+  <div class="nextrade-price-row" id="nextrade-price-row" style="cursor:pointer;opacity:.75;font-size:12.5px;margin-top:2px;">
+    1 Nex Trade ≈ <span id="nextrade-price-val" class="num">0.9957</span> so'm
+  </div>
 </header>
 
 <nav class="tabs">
@@ -353,6 +356,10 @@
       </div>
       <div class="pnl" id="portfolio-pnl-pct" style="font-size:15px;">0%</div>
     </div>
+    <div class="card" style="margin-bottom:14px;">
+      <div class="detail-meta" style="margin-bottom:6px;">Balans tarixi</div>
+      <canvas id="balanceHistoryChart" height="120"></canvas>
+    </div>
     <div id="portfolio-list"></div>
   </section>
 
@@ -365,6 +372,11 @@
       <div class="field">
         <label>Belgisi (symbol)</label>
         <input id="new-symbol" type="text" placeholder="Masalan: ALI" maxlength="16" style="text-transform:uppercase" />
+      </div>
+      <div class="field">
+        <label>Rasm (logotip) havolasi - ixtiyoriy</label>
+        <input id="new-image" type="url" placeholder="https://..." />
+        <div class="hint">Token rasmi uchun to'g'ridan-to'g'ri rasm havolasini kiriting (imgur, telegra.ph va h.k.). Bo'sh qoldirsangiz, standart belgi ko'rsatiladi.</div>
       </div>
       <div class="field">
         <label>Maksimal miqdor (max 10 000)</label>
@@ -406,10 +418,36 @@
         <div class="hint">Har bir yangi do'stingiz uchun ikkalangizga ham bonus Nex Trade beriladi.</div>
         <div class="referral-link" id="referral-link">—</div>
       </div>
+      <div class="referral-box" id="deposit-locked-btn" style="cursor:pointer;">
+        <div style="font-weight:600;font-size:13.5px;">💳 Pul kiritish / chiqarish 🔒</div>
+        <div class="hint">Humo, Uzcard, Click, Payme orqali. Litsenziya jarayoni tugagach ochiladi.</div>
+      </div>
+      <div class="referral-box" id="pro-locked-btn" style="cursor:pointer;">
+        <div style="font-weight:600;font-size:13.5px;">💎 PRO token 🔒</div>
+        <div class="hint">Real pulga bog'liq token yaratish. Litsenziya jarayoni tugagach ochiladi.</div>
+      </div>
     </div>
     <div class="section-title">Mening tokenlarim</div>
     <div id="my-tokens-list"></div>
   </section>
+
+  <div class="detail-overlay" id="locked-overlay">
+    <div class="detail-header">
+      <button class="back-btn" id="locked-back">←</button>
+      <div>
+        <div id="locked-title" style="font-weight:700;font-size:15px;">—</div>
+        <div class="detail-meta">Hozircha mavjud emas</div>
+      </div>
+    </div>
+    <div class="detail-body" style="text-align:center;padding-top:40px;">
+      <div style="font-size:56px;margin-bottom:14px;">🔒</div>
+      <div style="font-weight:700;font-size:17px;margin-bottom:10px;" id="locked-heading">Litsenziya olingandan keyin ochiladi</div>
+      <div class="hint" id="locked-desc" style="font-size:14px;line-height:1.6;">
+        Bu funksiya O'zbekiston Respublikasi qonunchiligiga muvofiq maxsus litsenziya talab qiladi.
+        Litsenziya jarayoni yakunlangach, bu bo'lim avtomatik faollashadi.
+      </div>
+    </div>
+  </div>
 
   <section class="screen" id="screen-admin">
     <div class="card">
@@ -463,6 +501,7 @@
 <div class="detail-overlay" id="detail-overlay">
   <div class="detail-header">
     <button class="back-btn" id="detail-back">←</button>
+    <div id="detail-avatar" style="width:34px;height:34px;border-radius:10px;overflow:hidden;flex-shrink:0;display:none;"></div>
     <div>
       <div id="detail-name" style="font-weight:700;font-size:15px;">—</div>
       <div class="detail-meta" id="detail-symbol">—</div>
@@ -478,8 +517,31 @@
       <button class="primary" id="detail-buy">Sotib olish</button>
       <button class="ghost" id="detail-sell" style="margin-top:0;">Sotish</button>
     </div>
+    <div class="card" id="detail-boost-card" style="display:none;margin-top:14px;">
+      <div style="font-weight:700;margin-bottom:4px;">🚀 Tokenni kuchaytirish</div>
+      <div class="hint" style="margin:0 0 10px;">O'z Nex Trade balansingizdan mablag' kiriting - bu summa qaytarilmaydi, lekin tokeningizning narxini butunlay (doimiy) oshiradi.</div>
+      <div class="field">
+        <input id="boost-amount" type="number" placeholder="Miqdor (Nex Trade)" min="0.0001" step="0.0001" />
+      </div>
+      <button class="primary" id="boost-btn">Kiritish va narxni oshirish</button>
+    </div>
     <div class="section-title">Savdo tarixi</div>
     <div id="history-list"></div>
+  </div>
+</div>
+
+<div class="detail-overlay" id="nextrade-overlay">
+  <div class="detail-header">
+    <button class="back-btn" id="nextrade-back">←</button>
+    <div>
+      <div style="font-weight:700;font-size:15px;">Nex Trade</div>
+      <div class="detail-meta">$NEXT · Asosiy valyuta</div>
+    </div>
+  </div>
+  <div class="detail-body">
+    <div class="detail-price-big num" id="nextrade-detail-price">0.9957</div>
+    <div class="detail-meta">so'mda, jonli narx</div>
+    <canvas id="nextradeChart" height="140"></canvas>
   </div>
 </div>
 
@@ -672,6 +734,14 @@
     return symbol.slice(0,3).toUpperCase();
   }
 
+  function tokenBadgeHtml(t){
+    if(t.image_url){
+      const letters = tokenBadgeLetters(t.symbol);
+      return `<div class="token-badge" style="padding:0;overflow:hidden;" data-fallback="${letters}"><img src="${t.image_url}" alt="${t.symbol}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" onerror="this.style.display='none';this.parentElement.textContent=this.parentElement.dataset.fallback;" /></div>`;
+    }
+    return `<div class="token-badge">${tokenBadgeLetters(t.symbol)}</div>`;
+  }
+
   function renderMarket(tokens){
     const list = document.getElementById("market-list");
     if(!tokens.length){
@@ -699,7 +769,7 @@
     return `
       <div class="token-row" data-id="${t.id}" data-name="${t.name}" data-symbol="${t.symbol}" data-price="${t.current_price}">
         <button class="fav-star ${isFav ? "active" : ""}" data-fav-id="${t.id}">${isFav ? "★" : "☆"}</button>
-        <div class="token-badge">${tokenBadgeLetters(t.symbol)}</div>
+        ${tokenBadgeHtml(t)}
         <div class="token-info">
           <div class="token-name">${t.name}</div>
           <div class="token-sub">$${t.symbol} · ${fmt(t.circulating_supply)}/${fmt(t.max_supply)}</div>
@@ -916,6 +986,13 @@
   async function loadPortfolio(){
     const list = document.getElementById("portfolio-list");
     const summary = document.getElementById("portfolio-summary");
+
+    // Balans tarixi grafigi - portfolio yuklanishidan mustaqil, xato bo'lsa
+    // ham qolgan portfolio ma'lumotlari ko'rsatilishiga xalaqit bermasin.
+    api(`/user/${currentUser.id}/balance-history`).then(history=>{
+      drawPriceChart(history, Number(currentUser.nex_trade_balance ?? 0), "balanceHistoryChart", null);
+    }).catch(()=>{});
+
     try{
       const holdings = await api(`/user/${currentUser.id}/holdings`);
       if(!holdings.length){
@@ -942,7 +1019,7 @@
 
         return `
         <div class="token-row" data-id="${h.token_id}" data-name="${h.name}" data-symbol="${h.symbol}" data-price="${h.current_price}">
-          <div class="token-badge">${tokenBadgeLetters(h.symbol)}</div>
+          ${tokenBadgeHtml({symbol: h.symbol, image_url: h.image_url})}
           <div class="token-info">
             <div class="token-name">${h.name}</div>
             <div class="token-sub">${fmt(h.amount)} ta token</div>
@@ -983,6 +1060,18 @@
       document.getElementById("detail-supply").textContent =
         `${fmt(token.circulating_supply)} / ${fmt(token.max_supply)} muomalada`;
 
+      const avatarEl = document.getElementById("detail-avatar");
+      if(token.image_url){
+        avatarEl.style.display = "block";
+        avatarEl.innerHTML = `<img src="${token.image_url}" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.style.display='none';" />`;
+      } else {
+        avatarEl.style.display = "none";
+        avatarEl.innerHTML = "";
+      }
+
+      const boostCard = document.getElementById("detail-boost-card");
+      boostCard.style.display = (currentUser && Number(token.owner_id) === currentUser.id) ? "block" : "none";
+
       const [chart, history] = await Promise.all([
         api(`/tokens/${tokenId}/chart`),
         api(`/tokens/${tokenId}/history`)
@@ -1012,6 +1101,44 @@
     if(detailRefreshInterval) clearInterval(detailRefreshInterval);
     detailRefreshInterval = setInterval(()=> refreshTokenDetail(selectedTokenId), 10000);
   }
+
+  document.getElementById("boost-btn").addEventListener("click", async ()=>{
+    const amount = Number(document.getElementById("boost-amount").value);
+    if(!amount || amount <= 0){ toast("Miqdorni to'g'ri kiriting"); return; }
+    const btn = document.getElementById("boost-btn");
+    const restore = setLoading(btn, "Kiritilmoqda...");
+    try{
+      await api(`/tokens/${selectedTokenId}/boost`, {
+        method:"POST",
+        body: JSON.stringify({ user_id: currentUser.id, amount })
+      });
+      toast("Narx oshirildi!");
+      document.getElementById("boost-amount").value = "";
+      currentUser = await api("/user/init", { method:"POST", body: JSON.stringify({ telegram_id: currentUser.telegram_id, username: currentUser.username }) });
+      document.getElementById("balance").textContent = fmt(currentUser.nex_trade_balance);
+      await refreshTokenDetail(selectedTokenId);
+    }catch(e){ toast(friendlyError(e)); }
+    finally{ restore(); }
+  });
+
+  // ====== QULFLANGAN BO'LIMLAR (litsenziya kutilmoqda) ======
+  document.getElementById("deposit-locked-btn").addEventListener("click", ()=>{
+    document.getElementById("locked-title").textContent = "Pul kiritish / chiqarish";
+    document.getElementById("locked-heading").textContent = "🔒 Litsenziya olingandan keyin ochiladi";
+    document.getElementById("locked-desc").textContent =
+      "Humo, Uzcard, Click va Payme orqali pul kiritish/chiqarish uchun O'zbekiston Markaziy banki / NAPP litsenziyasi talab qilinadi. Litsenziya olingach, bu bo'lim avtomatik ishga tushadi.";
+    document.getElementById("locked-overlay").classList.add("active");
+  });
+  document.getElementById("pro-locked-btn").addEventListener("click", ()=>{
+    document.getElementById("locked-title").textContent = "PRO token";
+    document.getElementById("locked-heading").textContent = "🔒 Litsenziya olingandan keyin ochiladi";
+    document.getElementById("locked-desc").textContent =
+      "PRO token real pul kiritish orqali yaratiladi, shuning uchun bu funksiya ham yuqoridagi litsenziya bilan bog'liq. Litsenziya olingach, bu bo'lim avtomatik ishga tushadi.";
+    document.getElementById("locked-overlay").classList.add("active");
+  });
+  document.getElementById("locked-back").addEventListener("click", ()=>{
+    document.getElementById("locked-overlay").classList.remove("active");
+  });
 
   document.getElementById("detail-fav").addEventListener("click", async ()=>{
     const btn = document.getElementById("detail-fav");
@@ -1091,8 +1218,10 @@
     });
   });
 
-  function drawPriceChart(history, basePrice){
-    const canvas = document.getElementById("priceChart");
+  function drawPriceChart(history, basePrice, canvasId, priceLabelId){
+    canvasId = canvasId || "priceChart";
+    priceLabelId = priceLabelId || "detail-price";
+    const canvas = document.getElementById(canvasId);
     const ctx = canvas.getContext("2d");
     const dpr = window.devicePixelRatio || 1;
     const w = canvas.clientWidth, h = canvas.clientHeight || 140;
@@ -1137,8 +1266,49 @@
     ctx.lineJoin = "round";
     ctx.stroke();
 
-    document.getElementById("detail-price").style.color = trendUp ? "var(--up)" : "var(--down)";
+    const labelEl = document.getElementById(priceLabelId);
+    if(labelEl) labelEl.style.color = trendUp ? "var(--up)" : "var(--down)";
   }
+
+  // ====== NEX TRADE (ASOSIY VALYUTA) NARXI ======
+  let nextradeRefreshInterval = null;
+
+  // Balans tepasidagi "1 Nex Trade ≈ X so'm" qatorini yangilab turadi
+  // (overlay yopiq bo'lsa ham, har 10 soniyada).
+  async function refreshNexTradePriceHeader(){
+    try{
+      const data = await api("/nextrade/price");
+      document.getElementById("nextrade-price-val").textContent = Number(data.price).toFixed(4);
+    }catch(e){ /* jim */ }
+  }
+
+  async function refreshNexTradeDetail(){
+    try{
+      const [priceData, chart] = await Promise.all([
+        api("/nextrade/price"),
+        api("/nextrade/chart")
+      ]);
+      document.getElementById("nextrade-detail-price").textContent = Number(priceData.price).toFixed(4);
+      document.getElementById("nextrade-price-val").textContent = Number(priceData.price).toFixed(4);
+      drawPriceChart(chart, Number(priceData.price), "nextradeChart", "nextrade-detail-price");
+    }catch(e){ /* jim */ }
+  }
+
+  async function openNexTradeDetail(){
+    document.getElementById("nextrade-overlay").classList.add("active");
+    await refreshNexTradeDetail();
+    if(nextradeRefreshInterval) clearInterval(nextradeRefreshInterval);
+    nextradeRefreshInterval = setInterval(refreshNexTradeDetail, 10000);
+  }
+
+  document.getElementById("nextrade-price-row").addEventListener("click", openNexTradeDetail);
+  document.getElementById("nextrade-back").addEventListener("click", ()=>{
+    document.getElementById("nextrade-overlay").classList.remove("active");
+    if(nextradeRefreshInterval){ clearInterval(nextradeRefreshInterval); nextradeRefreshInterval = null; }
+  });
+
+  refreshNexTradePriceHeader();
+  setInterval(refreshNexTradePriceHeader, 10000);
 
   function renderHistoryList(history){
     const wrap = document.getElementById("history-list");
@@ -1214,18 +1384,22 @@
   document.getElementById("create-btn").addEventListener("click", async ()=>{
     const name = document.getElementById("new-name").value.trim();
     const symbol = document.getElementById("new-symbol").value.trim();
+    const imageUrl = document.getElementById("new-image").value.trim();
     const supply = Number(document.getElementById("new-supply").value);
     if(!name || !symbol || !supply){ toast("Hamma maydonlarni to'ldiring"); return; }
     const btn = document.getElementById("create-btn");
     const restore = setLoading(btn, "Yaratilmoqda...");
     try{
+      const body = { owner_id: currentUser.id, name, symbol, max_supply: supply };
+      if(imageUrl) body.image_url = imageUrl;
       await api("/tokens", {
         method:"POST",
-        body: JSON.stringify({ owner_id: currentUser.id, name, symbol, max_supply: supply })
+        body: JSON.stringify(body)
       });
       toast("Token yaratildi!");
       document.getElementById("new-name").value = "";
       document.getElementById("new-symbol").value = "";
+      document.getElementById("new-image").value = "";
       document.getElementById("new-supply").value = "";
       document.querySelector('[data-tab="market"]').click();
       await loadMarket();
