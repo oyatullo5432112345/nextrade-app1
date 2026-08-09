@@ -116,3 +116,50 @@ CREATE TABLE IF NOT EXISTS frozen_withdrawals (
     created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_frozen_withdrawals_token ON frozen_withdrawals(token_id);
+
+-- Nex Trade (asosiy valyuta) ning real dunyo (UZS) qiymati. Bitta qatorli
+-- jadval - hozirgi narxni saqlaydi. Boshlang'ich qiymat 0.9957 UZS.
+CREATE TABLE IF NOT EXISTS nex_trade_price (
+    id INTEGER PRIMARY KEY DEFAULT 1,
+    price NUMERIC(20, 8) NOT NULL DEFAULT 0.9957,
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CHECK (id = 1)
+);
+INSERT INTO nex_trade_price (id, price)
+VALUES (1, 0.9957)
+ON CONFLICT (id) DO NOTHING;
+
+-- Nex Trade narxining tarixi - grafik chizish uchun (tokenlardagi price_ticks
+-- kabi, lekin bu safar butun platformaning asosiy valyutasi uchun).
+CREATE TABLE IF NOT EXISTS nex_trade_price_ticks (
+    id SERIAL PRIMARY KEY,
+    price NUMERIC(20, 8) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_nex_trade_price_ticks_time ON nex_trade_price_ticks(created_at);
+
+-- Foydalanuvchi Nex Trade balansi har o'zgarganda shu yerga "surat" (snapshot)
+-- sifatida yoziladi - Portfolio grafigini chizish uchun ishlatiladi.
+CREATE TABLE IF NOT EXISTS balance_history (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    balance NUMERIC(20, 4) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_balance_history_user_time ON balance_history(user_id, created_at);
+
+-- Token uchun rasm (logotip) - foydalanuvchi token yaratganda URL kiritadi.
+ALTER TABLE tokens ADD COLUMN IF NOT EXISTS image_url TEXT;
+
+-- Token egasi o'z Nex Trade'ini tokeniga "kiritib" (qaytarilmas tarzda)
+-- narxini doimiy oshirishi mumkin - shu tarix shu yerda saqlanadi.
+CREATE TABLE IF NOT EXISTS token_boosts (
+    id SERIAL PRIMARY KEY,
+    token_id INTEGER NOT NULL REFERENCES tokens(id),
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    amount NUMERIC(20, 4) NOT NULL,
+    old_base_price NUMERIC(20, 8) NOT NULL,
+    new_base_price NUMERIC(20, 8) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_token_boosts_token ON token_boosts(token_id);
