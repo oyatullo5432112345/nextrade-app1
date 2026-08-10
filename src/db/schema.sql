@@ -176,3 +176,59 @@ ALTER TABLE tokens ALTER COLUMN base_price TYPE NUMERIC(20, 8);
 -- tokenni "tasdiqlangan/PRO" deb belgilash - reklama/nishon maqsadida.
 ALTER TABLE tokens ADD COLUMN IF NOT EXISTS is_pro BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE tokens ADD COLUMN IF NOT EXISTS pro_since TIMESTAMP;
+
+-- GIGANT TOKENLAR: platformaning o'zi tomonidan yaratilgan, yuqori boshlang'ich
+-- narxli (12,000-67,000 UZS) tokenlar - bozorda alohida ajratib ko'rsatiladi.
+ALTER TABLE tokens ADD COLUMN IF NOT EXISTS is_featured BOOLEAN NOT NULL DEFAULT false;
+
+-- Bu tokenlarning "egasi" - platformaning tizim hisobi (haqiqiy Telegram
+-- foydalanuvchisi emas, shuning uchun manfiy telegram_id ishlatiladi -
+-- haqiqiy Telegram ID'lar doim musbat bo'ladi, shu bilan to'qnashuv bo'lmaydi).
+INSERT INTO users (telegram_id, username, nex_trade_balance)
+VALUES (-1, 'NexTrade Platform', 0)
+ON CONFLICT (telegram_id) DO NOTHING;
+
+INSERT INTO tokens (owner_id, name, symbol, max_supply, circulating_supply, base_price, current_price, curve_k, is_featured)
+SELECT u.id, 'NexGold', 'NXG', 600, 0, 45000, 45000, 1.5, true
+FROM users u WHERE u.telegram_id = -1
+ON CONFLICT (symbol) DO NOTHING;
+
+INSERT INTO tokens (owner_id, name, symbol, max_supply, circulating_supply, base_price, current_price, curve_k, is_featured)
+SELECT u.id, 'NexDiamond', 'NXD', 400, 0, 67000, 67000, 1.5, true
+FROM users u WHERE u.telegram_id = -1
+ON CONFLICT (symbol) DO NOTHING;
+
+INSERT INTO tokens (owner_id, name, symbol, max_supply, circulating_supply, base_price, current_price, curve_k, is_featured)
+SELECT u.id, 'NexTitan', 'TITAN', 800, 0, 28500, 28500, 1.5, true
+FROM users u WHERE u.telegram_id = -1
+ON CONFLICT (symbol) DO NOTHING;
+
+INSERT INTO tokens (owner_id, name, symbol, max_supply, circulating_supply, base_price, current_price, curve_k, is_featured)
+SELECT u.id, 'NexPlatinum', 'PLAT', 500, 0, 52000, 52000, 1.5, true
+FROM users u WHERE u.telegram_id = -1
+ON CONFLICT (symbol) DO NOTHING;
+
+INSERT INTO tokens (owner_id, name, symbol, max_supply, circulating_supply, base_price, current_price, curve_k, is_featured)
+SELECT u.id, 'NexRoyal', 'ROYAL', 1000, 0, 12800, 12800, 1.5, true
+FROM users u WHERE u.telegram_id = -1
+ON CONFLICT (symbol) DO NOTHING;
+
+-- ====== HAMYON (WALLET) - foydalanuvchilar orasida to'g'ridan-to'g'ri
+-- Nex Trade jo'natish uchun ======
+-- Har bir foydalanuvchiga o'ziga xos, o'zgarmas hamyon kodi (masalan NX-A1B2C3)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS wallet_code VARCHAR(16) UNIQUE;
+
+UPDATE users
+SET wallet_code = 'NX-' || UPPER(SUBSTRING(MD5(id::text || telegram_id::text) FROM 1 FOR 6))
+WHERE wallet_code IS NULL;
+
+CREATE TABLE IF NOT EXISTS wallet_transfers (
+    id SERIAL PRIMARY KEY,
+    from_user_id INTEGER NOT NULL REFERENCES users(id),
+    to_user_id INTEGER NOT NULL REFERENCES users(id),
+    amount NUMERIC(20, 4) NOT NULL CHECK (amount > 0),
+    note VARCHAR(140),
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_wallet_transfers_from ON wallet_transfers(from_user_id);
+CREATE INDEX IF NOT EXISTS idx_wallet_transfers_to ON wallet_transfers(to_user_id);
