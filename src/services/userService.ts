@@ -2,7 +2,7 @@ import { pool } from "../db/pool";
 import { recordBalanceSnapshot } from "./balanceHistoryService";
 
 // .env faylida INITIAL_BALANCE, REFERRAL_BONUS, DAILY_BONUS orqali sozlash mumkin
-const INITIAL_NEX_TRADE_BALANCE = Number(process.env.INITIAL_BALANCE ?? 10);
+const INITIAL_NEX_TRADE_BALANCE = Number(process.env.INITIAL_BALANCE ?? 100);
 const REFERRAL_BONUS = Number(process.env.REFERRAL_BONUS ?? 1); // taklif qilgan va qilingan foydalanuvchiga qo'shimcha bonus
 const DAILY_BONUS = Number(process.env.DAILY_BONUS ?? 1); // har 24 soatda bir marta olinadigan bonus
 
@@ -30,7 +30,7 @@ export async function getOrCreateUser(
   );
 
   if (existing.rows.length > 0) {
-    return existing.rows[0];
+    return { ...existing.rows[0], is_new: false } as User & { is_new: boolean };
   }
 
   const client = await pool.connect();
@@ -57,14 +57,15 @@ export async function getOrCreateUser(
       INITIAL_NEX_TRADE_BALANCE + (referrerId ? REFERRAL_BONUS : 0);
 
     const created = await client.query<User>(
-      `INSERT INTO users (telegram_id, username, nex_trade_balance, referred_by)
-       VALUES ($1, $2, $3, $4) RETURNING *`,
+      `INSERT INTO users (telegram_id, username, nex_trade_balance, referred_by, wallet_code)
+       VALUES ($1, $2, $3, $4, 'NX-' || UPPER(SUBSTRING(MD5($1::text || random()::text) FROM 1 FOR 6)))
+       RETURNING *`,
       [telegramId, username ?? null, initialBalance, referrerId]
     );
     await recordBalanceSnapshot(created.rows[0].id, created.rows[0].nex_trade_balance, client);
 
     await client.query("COMMIT");
-    return created.rows[0];
+    return { ...created.rows[0], is_new: true } as User & { is_new: boolean };
   } catch (err) {
     await client.query("ROLLBACK");
     throw err;

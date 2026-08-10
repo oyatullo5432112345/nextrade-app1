@@ -65,8 +65,19 @@ export async function getTradeQuote(tokenId: number, side: "buy" | "sell", amoun
 
 export async function listTopTokens(limit = 20) {
   const result = await pool.query(
-    `SELECT * FROM tokens ORDER BY current_price DESC, circulating_supply DESC LIMIT $1`,
+    `SELECT * FROM tokens WHERE is_featured = false ORDER BY current_price DESC, circulating_supply DESC LIMIT $1`,
     [limit]
+  );
+  return result.rows;
+}
+
+/**
+ * Platforma tomonidan yaratilgan "gigant" tokenlar (yuqori boshlang'ich narxli,
+ * is_featured=true) - bozorda alohida, maxsus bo'limda ko'rsatiladi.
+ */
+export async function getFeaturedTokens() {
+  const result = await pool.query(
+    `SELECT * FROM tokens WHERE is_featured = true ORDER BY current_price DESC`
   );
   return result.rows;
 }
