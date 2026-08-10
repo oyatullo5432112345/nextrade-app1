@@ -132,7 +132,7 @@ apiRouter.post("/tokens", ah(async (req, res) => {
     owner_id: z.number(),
     name: z.string().min(1).max(64),
     symbol: z.string().min(1).max(16),
-    max_supply: z.number().positive().max(10000),
+    max_supply: z.number().min(10).max(10000),
     image_url: z.string().url().max(1000).optional(),
   });
   const parsed = schema.safeParse(req.body);
