@@ -9,13 +9,15 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg: #0B0F1A;
-    --bg-elevated: #131826;
-    --card: #171D2E;
-    --border: #232B40;
+    --bg: #080B13;
+    --bg-elevated: #121728;
+    --card: #161C30;
+    --border: #262E48;
     --text: #EDEFF5;
     --muted: #7C8699;
     --gold: #FFC857;
+    --ember: #FF7A45;
+    --violet: #8B7CFF;
     --up: #00D68F;
     --down: #FF5C72;
     --radius: 16px;
@@ -28,9 +30,52 @@
     --text: #171A22;
     --muted: #7C8699;
     --gold: #C9821A;
+    --ember: #E85D2C;
+    --violet: #6C5CE7;
     --up: #12A876;
     --down: #E1435A;
   }
+  @media (prefers-reduced-motion: reduce){
+    *, *::before, *::after{ animation-duration:0.001ms !important; animation-iteration-count:1 !important; transition-duration:0.001ms !important; }
+  }
+  .flash-up{ animation:flashUp .7s ease; }
+  .flash-down{ animation:flashDown .7s ease; }
+  @keyframes flashUp{ 0%{ background:rgba(0,214,143,.28); } 100%{ background:transparent; } }
+  @keyframes flashDown{ 0%{ background:rgba(255,92,114,.28); } 100%{ background:transparent; } }
+  button, .token-row, .lb-card, .featured-card, .tab-btn{ transition:transform .12s ease; }
+  button:active, .token-row:active, .lb-card:active, .featured-card:active{ transform:scale(.96); }
+  @keyframes fadeUpIn{ from{ opacity:0; transform:translateY(10px); } to{ opacity:1; transform:translateY(0); } }
+  .stagger-in{ animation:fadeUpIn .38s ease backwards; }
+
+  /* ====== JONLI TICKER TAPE - signatura elementi ====== */
+  .ticker-wrap{
+    overflow:hidden; white-space:nowrap; border-bottom:1px solid var(--border);
+    background:linear-gradient(90deg, var(--bg-elevated), var(--card));
+    padding:8px 0; position:relative;
+  }
+  .ticker-wrap::before, .ticker-wrap::after{
+    content:""; position:absolute; top:0; bottom:0; width:24px; z-index:2; pointer-events:none;
+  }
+  .ticker-wrap::before{ left:0; background:linear-gradient(90deg, var(--bg-elevated), transparent); }
+  .ticker-wrap::after{ right:0; background:linear-gradient(270deg, var(--bg-elevated), transparent); }
+  .ticker-track{
+    display:inline-flex; gap:0; animation:tickerScroll 38s linear infinite;
+    will-change:transform;
+  }
+  .ticker-wrap:active .ticker-track{ animation-play-state:paused; }
+  @keyframes tickerScroll{
+    from{ transform:translateX(0); }
+    to{ transform:translateX(-50%); }
+  }
+  .ticker-item{
+    display:inline-flex; align-items:baseline; gap:6px; padding:0 18px;
+    font-family:'Space Grotesk',sans-serif; font-size:12.5px; white-space:nowrap;
+  }
+  .ticker-item .sym{ font-weight:700; color:var(--text); }
+  .ticker-item .px{ color:var(--muted); }
+  .ticker-item .chg{ font-weight:700; }
+  .ticker-item .chg.up{ color:var(--up); }
+  .ticker-item .chg.down{ color:var(--down); }
   *{box-sizing:border-box; margin:0; padding:0;}
   html,body{
     background:var(--bg);
@@ -63,6 +108,7 @@
   .balance-num{
     font-family:'Space Grotesk',sans-serif;
     font-size:34px; font-weight:700; color:var(--gold);
+    border-radius:8px; padding:2px 4px; margin:-2px -4px;
   }
   .balance-unit{ color:var(--muted); font-size:14px; font-weight:500; }
 
@@ -189,7 +235,7 @@
 
   .modal-backdrop{
     position:fixed; inset:0; background:rgba(0,0,0,.6);
-    display:none; align-items:flex-end; z-index:50;
+    display:none; align-items:flex-end; z-index:100;
   }
   .modal-backdrop.active{ display:flex; }
   .modal{
@@ -212,6 +258,27 @@
     -webkit-overflow-scrolling:touch;
   }
   .leaderboard::-webkit-scrollbar{ display:none; }
+  .featured-list{
+    display:flex; gap:12px; overflow-x:auto; padding:2px 2px 14px;
+    -webkit-overflow-scrolling:touch;
+  }
+  .featured-list::-webkit-scrollbar{ display:none; }
+  .featured-card{
+    flex-shrink:0; width:150px; border-radius:16px; padding:14px;
+    background:linear-gradient(160deg, #2A2110, #1A1400 70%);
+    border:1px solid var(--gold); position:relative; overflow:hidden;
+  }
+  .featured-card::after{
+    content:"👑"; position:absolute; top:8px; right:10px; font-size:14px; opacity:.8;
+  }
+  .featured-badge{
+    width:38px; height:38px; border-radius:11px; background:#1A1400;
+    border:1px solid var(--gold); display:flex; align-items:center; justify-content:center;
+    font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:13px; color:var(--gold);
+    margin-bottom:10px;
+  }
+  .featured-name{ font-size:13px; font-weight:700; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .featured-price{ font-family:'Space Grotesk',sans-serif; font-size:14px; font-weight:700; color:var(--gold); margin-top:4px; }
   .lb-card{
     flex-shrink:0; width:118px; background:var(--card); border:1px solid var(--border);
     border-radius:14px; padding:12px; position:relative;
@@ -317,6 +384,48 @@
     opacity:0; transform:translateY(10px); transition:.25s; pointer-events:none; z-index:60;
   }
   #toast.show{ opacity:1; transform:translateY(0); }
+
+  /* Yangi foydalanuvchi uchun "sovg'a" popup - jonli, sakrab chiquvchi animatsiya */
+  #welcome-popup-backdrop{
+    position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:200;
+    display:none; align-items:center; justify-content:center; padding:24px;
+    backdrop-filter:blur(4px);
+  }
+  #welcome-popup-backdrop.show{ display:flex; }
+  #welcome-popup-card{
+    background:linear-gradient(160deg, var(--bg-elevated), #1A1400 140%);
+    border:1px solid var(--gold); border-radius:24px; padding:32px 24px 26px;
+    text-align:center; max-width:320px; width:100%;
+    transform:scale(.4) translateY(40px); opacity:0;
+    animation:welcomePop .55s cubic-bezier(.34,1.56,.64,1) forwards;
+    box-shadow:0 0 60px rgba(255,193,68,.25);
+  }
+  @keyframes welcomePop{
+    0%{ transform:scale(.4) translateY(40px); opacity:0; }
+    60%{ transform:scale(1.06) translateY(-6px); opacity:1; }
+    100%{ transform:scale(1) translateY(0); opacity:1; }
+  }
+  #welcome-popup-emoji{
+    font-size:52px; margin-bottom:6px;
+    animation:welcomeBounce 1.4s ease-in-out infinite .6s;
+  }
+  @keyframes welcomeBounce{
+    0%,100%{ transform:translateY(0) rotate(0deg); }
+    50%{ transform:translateY(-8px) rotate(-6deg); }
+  }
+  #welcome-popup-title{
+    font-family:'Space Grotesk',sans-serif; font-size:20px; font-weight:700; color:#fff;
+    margin-bottom:6px;
+  }
+  #welcome-popup-text{ font-size:13.5px; color:var(--muted); margin-bottom:18px; line-height:1.5; }
+  #welcome-popup-amount{
+    font-family:'Space Grotesk',sans-serif; font-size:30px; font-weight:700; color:var(--gold);
+    margin-bottom:22px;
+  }
+  #welcome-popup-btn{
+    width:100%; background:var(--gold); color:#1a1200; border:none; border-radius:14px;
+    padding:14px; font-weight:700; font-size:15px; cursor:pointer;
+  }
 </style>
 </head>
 <body>
@@ -333,6 +442,10 @@
   </div>
 </header>
 
+<div class="ticker-wrap" id="ticker-wrap">
+  <div class="ticker-track" id="ticker-track"></div>
+</div>
+
 <nav class="tabs">
   <button class="tab-btn active" data-tab="market">Bozor</button>
   <button class="tab-btn" data-tab="portfolio">Portfelim</button>
@@ -345,6 +458,8 @@
   <section class="screen active" id="screen-market">
     <input class="search-box" id="search-input" type="text" placeholder="🔍 Token nomi yoki belgisi bo'yicha qidirish" autocomplete="off" />
     <div class="search-history hidden" id="search-history"></div>
+    <div class="section-title" id="featured-title" style="display:none;">🐋 Gigant tokenlar</div>
+    <div id="featured-list" class="featured-list"></div>
     <div class="section-title" id="leaderboard-title">Top tokenlar</div>
     <div class="leaderboard" id="leaderboard"></div>
     <div class="section-title hidden" id="favorites-title" style="display:none;">⭐ Sevimlilar</div>
@@ -423,6 +538,11 @@
         <div class="hint">Har bir yangi do'stingiz uchun ikkalangizga ham bonus Nex Trade beriladi.</div>
         <div class="referral-link" id="referral-link">—</div>
       </div>
+      <div class="referral-box" id="wallet-open-btn" style="cursor:pointer;background:linear-gradient(135deg, rgba(255,193,68,.12), rgba(255,138,92,.06));border-color:var(--gold);">
+        <div style="font-weight:700;font-size:13.5px;">👛 Mening hamyonim</div>
+        <div class="hint">Hamyon raqamingiz va boshqalarga Nex Trade jo'natish</div>
+        <div class="referral-link num" id="wallet-code-preview" style="color:var(--gold);font-weight:700;">—</div>
+      </div>
       <div class="referral-box" id="deposit-locked-btn" style="cursor:pointer;">
         <div style="font-weight:600;font-size:13.5px;">💳 Pul kiritish / chiqarish 🔒</div>
         <div class="hint">Humo, Uzcard, Click, Payme orqali. Litsenziya jarayoni tugagach ochiladi.</div>
@@ -435,6 +555,43 @@
     <div class="section-title">Mening tokenlarim</div>
     <div id="my-tokens-list"></div>
   </section>
+
+  <div class="detail-overlay" id="wallet-overlay">
+    <div class="detail-header">
+      <button class="back-btn" id="wallet-back">←</button>
+      <div>
+        <div style="font-weight:700;font-size:15px;">Hamyon</div>
+        <div class="detail-meta">Nex Trade jo'natish/qabul qilish</div>
+      </div>
+    </div>
+    <div class="detail-body">
+      <div class="card" style="text-align:center;">
+        <div class="hint" style="margin-bottom:6px;">Sizning hamyon raqamingiz</div>
+        <div class="num" id="wallet-code-big" style="font-size:22px;font-weight:700;color:var(--gold);letter-spacing:.04em;">—</div>
+        <div class="hint" style="margin-top:8px;">Do'stingizga shu kodni bering - u sizga Nex Trade jo'nata oladi</div>
+      </div>
+
+      <div class="card" style="margin-top:14px;">
+        <div style="font-weight:700;margin-bottom:10px;">💸 Jo'natish</div>
+        <div class="field">
+          <label>Qabul qiluvchi hamyon kodi</label>
+          <input id="wallet-to-code" type="text" placeholder="NX-A1B2C3" style="text-transform:uppercase;" />
+        </div>
+        <div class="field">
+          <label>Miqdor (Nex Trade)</label>
+          <input id="wallet-amount" type="number" placeholder="0" min="0.0001" step="0.0001" />
+        </div>
+        <div class="field">
+          <label>Izoh (ixtiyoriy)</label>
+          <input id="wallet-note" type="text" placeholder="Masalan: qarz" maxlength="140" />
+        </div>
+        <button class="primary" id="wallet-send-btn">Jo'natish</button>
+      </div>
+
+      <div class="section-title" style="margin-top:18px;">O'tkazmalar tarixi</div>
+      <div id="wallet-history-list"></div>
+    </div>
+  </div>
 
   <div class="detail-overlay" id="locked-overlay">
     <div class="detail-header">
@@ -484,6 +641,16 @@
 </main>
 
 <div id="toast"></div>
+
+<div id="welcome-popup-backdrop">
+  <div id="welcome-popup-card">
+    <div id="welcome-popup-emoji">🎉</div>
+    <div id="welcome-popup-title">Xush kelibsiz!</div>
+    <div id="welcome-popup-text">Ro'yxatdan o'tganingiz uchun sizga sovg'a berildi</div>
+    <div id="welcome-popup-amount">+<span id="welcome-popup-amount-num">100</span> Nex Trade</div>
+    <button id="welcome-popup-btn">Rahmat! 🙌</button>
+  </div>
+</div>
 
 <div class="modal-backdrop" id="trade-modal">
   <div class="modal">
@@ -682,7 +849,7 @@
         body: JSON.stringify({ telegram_id: currentUser.telegram_id, username: currentUser.username })
       });
       currentUser.nex_trade_balance = refreshed.nex_trade_balance;
-      document.getElementById("balance").textContent = fmt(currentUser.nex_trade_balance);
+      setBalance(currentUser.nex_trade_balance);
       await loadAdminFrozen();
     }catch(e){ toast(friendlyError(e)); }
     finally{ restore(); }
@@ -747,7 +914,13 @@
       method:"POST",
       body: JSON.stringify({ telegram_id: telegramId, username, referrer_telegram_id: referrerTelegramId })
     });
-    document.getElementById("balance").textContent = fmt(currentUser.nex_trade_balance);
+    setBalance(currentUser.nex_trade_balance);
+
+    if(currentUser.is_new){
+      document.getElementById("welcome-popup-amount-num").textContent = fmt(currentUser.nex_trade_balance);
+      document.getElementById("welcome-popup-backdrop").classList.add("show");
+      tg?.HapticFeedback?.notificationOccurred?.("success");
+    }
 
     try{
       const ids = await api(`/user/${currentUser.id}/favorites/ids`);
@@ -778,6 +951,10 @@
       return;
     }
     list.innerHTML = tokens.map(t=> tokenRowHtml(t)).join("");
+    list.querySelectorAll(".token-row").forEach((row,i)=>{
+      row.classList.add("stagger-in");
+      row.style.animationDelay = `${Math.min(i,10) * 35}ms`;
+    });
 
     list.querySelectorAll(".token-row").forEach(row=>{
       row.addEventListener("click", (e)=>{
@@ -859,6 +1036,25 @@
     }catch(e){ /* jim */ }
   }
 
+  async function loadFeaturedTokens(){
+    try{
+      const tokens = await api("/tokens/featured");
+      const wrap = document.getElementById("featured-list");
+      const title = document.getElementById("featured-title");
+      if(!tokens.length){ title.style.display = "none"; wrap.innerHTML = ""; return; }
+      title.style.display = "block";
+      wrap.innerHTML = tokens.map(t=>`
+        <div class="featured-card" data-id="${t.id}" data-name="${t.name}" data-symbol="${t.symbol}" data-price="${t.current_price}">
+          <div class="featured-badge">${tokenBadgeLetters(t.symbol)}</div>
+          <div class="featured-name">${t.name}</div>
+          <div class="featured-price num">${fmt(t.current_price)}</div>
+        </div>`).join("");
+      wrap.querySelectorAll(".featured-card").forEach(card=>{
+        card.addEventListener("click", ()=> openTokenDetail(card.dataset));
+      });
+    }catch(e){ /* jim */ }
+  }
+
   async function loadMarket(query){
     try{
       const path = query && query.trim() ? `/tokens?q=${encodeURIComponent(query.trim())}` : "/tokens";
@@ -872,8 +1068,11 @@
       document.getElementById("favorites-title").style.display = (isSearching || !favoriteIds.size) ? "none" : "block";
       document.getElementById("favorites-list").style.display = (isSearching || !favoriteIds.size) ? "none" : "flex";
       document.getElementById("market-list-title").textContent = isSearching ? "Qidiruv natijalari" : "Barcha tokenlar";
+      document.getElementById("featured-title").style.display = isSearching ? "none" : "";
+      document.getElementById("featured-list").style.display = isSearching ? "none" : "flex";
 
       if(isSearching) saveSearchHistory(query.trim());
+      else loadFeaturedTokens();
     }catch(e){ toast(friendlyError(e)); }
   }
 
@@ -948,6 +1147,10 @@
         toast(friendlyError(e));
       }
     };
+
+    api(`/user/${currentUser.id}/wallet`).then(w=>{
+      document.getElementById("wallet-code-preview").textContent = w.wallet_code;
+    }).catch(()=>{});
 
     try{
       const [myTokens, referrals] = await Promise.all([
@@ -1152,7 +1355,7 @@
       toast("Narx oshirildi!");
       document.getElementById("boost-amount").value = "";
       currentUser = await api("/user/init", { method:"POST", body: JSON.stringify({ telegram_id: currentUser.telegram_id, username: currentUser.username }) });
-      document.getElementById("balance").textContent = fmt(currentUser.nex_trade_balance);
+      setBalance(currentUser.nex_trade_balance);
       await refreshTokenDetail(selectedTokenId);
     }catch(e){ toast(friendlyError(e)); }
     finally{ restore(); }
@@ -1178,7 +1381,7 @@
       });
       toast("✅ Token PRO holatiga o'tkazildi!");
       currentUser = await api("/user/init", { method:"POST", body: JSON.stringify({ telegram_id: currentUser.telegram_id, username: currentUser.username }) });
-      document.getElementById("balance").textContent = fmt(currentUser.nex_trade_balance);
+      setBalance(currentUser.nex_trade_balance);
       await refreshTokenDetail(selectedTokenId);
       await loadMarket();
     }catch(e){ toast(friendlyError(e)); }
@@ -1200,8 +1403,74 @@
       "PRO token real pul kiritish orqali yaratiladi, shuning uchun bu funksiya ham yuqoridagi litsenziya bilan bog'liq. Litsenziya olingach, bu bo'lim avtomatik ishga tushadi.";
     document.getElementById("locked-overlay").classList.add("active");
   });
+  document.getElementById("welcome-popup-btn").addEventListener("click", ()=>{
+    document.getElementById("welcome-popup-backdrop").classList.remove("show");
+  });
+
   document.getElementById("locked-back").addEventListener("click", ()=>{
     document.getElementById("locked-overlay").classList.remove("active");
+  });
+
+  // ====== HAMYON (WALLET) ======
+  async function loadWalletHistory(){
+    try{
+      const history = await api(`/user/${currentUser.id}/wallet/history`);
+      const list = document.getElementById("wallet-history-list");
+      if(!history.length){
+        list.innerHTML = `<div class="empty">
+          <div class="empty-icon">👛</div>
+          <div class="empty-title">Hali o'tkazma yo'q</div>
+        </div>`;
+        return;
+      }
+      list.innerHTML = history.map(h=>{
+        const isOut = h.direction === "out";
+        return `
+        <div class="market-row">
+          <div>
+            <div style="font-weight:600;">${isOut ? "➖ Jo'natildi" : "➕ Qabul qilindi"}</div>
+            <div class="hint" style="margin-top:2px;">${isOut ? "Kimga: " : "Kimdan: "}${h.counterparty_wallet}${h.note ? " · " + h.note : ""}</div>
+          </div>
+          <div class="num" style="font-weight:700;color:${isOut ? "var(--down)" : "var(--up)"};">${isOut ? "-" : "+"}${fmt(h.amount)}</div>
+        </div>`;
+      }).join("");
+    }catch(e){ /* jim */ }
+  }
+
+  document.getElementById("wallet-open-btn").addEventListener("click", async ()=>{
+    document.getElementById("wallet-overlay").classList.add("active");
+    try{
+      const w = await api(`/user/${currentUser.id}/wallet`);
+      document.getElementById("wallet-code-big").textContent = w.wallet_code;
+    }catch(e){ toast(friendlyError(e)); }
+    loadWalletHistory();
+  });
+  document.getElementById("wallet-back").addEventListener("click", ()=>{
+    document.getElementById("wallet-overlay").classList.remove("active");
+  });
+  document.getElementById("wallet-send-btn").addEventListener("click", async ()=>{
+    const toCode = document.getElementById("wallet-to-code").value.trim().toUpperCase();
+    const amount = Number(document.getElementById("wallet-amount").value);
+    const note = document.getElementById("wallet-note").value.trim();
+    if(!toCode){ toast("Hamyon kodini kiriting"); return; }
+    if(!amount || amount <= 0){ toast("Miqdorni to'g'ri kiriting"); return; }
+    const btn = document.getElementById("wallet-send-btn");
+    const restore = setLoading(btn, "Jo'natilmoqda...");
+    try{
+      const res = await api("/wallet/transfer", {
+        method:"POST",
+        body: JSON.stringify({ from_user_id: currentUser.id, to_wallet_code: toCode, amount, note: note || undefined })
+      });
+      currentUser.nex_trade_balance = res.newBalance;
+      setBalance(res.newBalance);
+      document.getElementById("stat-balance").textContent = fmt(res.newBalance);
+      toast(`✅ ${fmt(amount)} Nex Trade jo'natildi!`);
+      document.getElementById("wallet-to-code").value = "";
+      document.getElementById("wallet-amount").value = "";
+      document.getElementById("wallet-note").value = "";
+      loadWalletHistory();
+    }catch(e){ toast(friendlyError(e)); }
+    finally{ restore(); }
   });
 
   document.getElementById("detail-fav").addEventListener("click", async ()=>{
@@ -1525,6 +1794,48 @@
     finally{ restore(); }
   });
 
+  // ====== JONLI TICKER TAPE ======
+  async function refreshTicker(){
+    try{
+      const [tokens, featured] = await Promise.all([
+        api("/tokens"),
+        api("/tokens/featured")
+      ]);
+      const all = [...featured, ...tokens];
+      if(!all.length) return;
+      const items = all.map(t=>{
+        const base = Number(t.base_price) || Number(t.current_price);
+        const pct = base > 0 ? ((Number(t.current_price) - base) / base) * 100 : 0;
+        const isUp = pct >= 0;
+        return `<span class="ticker-item">
+          <span class="sym">$${t.symbol}</span>
+          <span class="px num">${fmt(t.current_price)}</span>
+          <span class="chg ${isUp ? "up" : "down"}">${isUp ? "▲" : "▼"} ${Math.abs(pct).toFixed(1)}%</span>
+        </span>`;
+      }).join("");
+      // Ikki marta takrorlanadi - shu bilan animatsiya uzluksiz (chok-siz) ko'rinadi
+      document.getElementById("ticker-track").innerHTML = items + items;
+    }catch(e){ /* jim */ }
+  }
+
+  // ====== RAQAM O'ZGARGANDA "YORQIN CHAQNASH" EFFEKTI ======
+  function flashNumber(el, newValue, oldValue){
+    if(!el || oldValue === undefined || oldValue === null) return;
+    const n = Number(newValue), o = Number(oldValue);
+    if(isNaN(n) || isNaN(o) || n === o) return;
+    el.classList.remove("flash-up", "flash-down");
+    void el.offsetWidth; // reflow - animatsiyani qayta ishga tushirish uchun
+    el.classList.add(n > o ? "flash-up" : "flash-down");
+  }
+
+  function setBalance(newValue){
+    const el = document.getElementById("balance");
+    const old = el.dataset.raw;
+    el.textContent = fmt(newValue);
+    flashNumber(el, newValue, old);
+    el.dataset.raw = newValue;
+  }
+
   (async function start(){
     try{
       await initUser();
@@ -1532,6 +1843,8 @@
       await loadMarket();
       await loadLeaderboard();
       await loadFavorites();
+      await refreshTicker();
+      setInterval(refreshTicker, 15000);
     }catch(e){
       toast(friendlyError(e));
     }
