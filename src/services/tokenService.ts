@@ -4,6 +4,7 @@ import { recordBalanceSnapshot } from "./balanceHistoryService";
 
 const DEFAULT_CURVE_K = 1.5;
 const MAX_SUPPLY_LIMIT = 10000;
+const MIN_SUPPLY_LIMIT = 10;
 
 export async function createToken(
   ownerId: number,
@@ -12,8 +13,8 @@ export async function createToken(
   maxSupply: number,
   imageUrl?: string | null
 ) {
-  if (maxSupply <= 0 || maxSupply > MAX_SUPPLY_LIMIT) {
-    throw new Error(`max_supply 1 dan ${MAX_SUPPLY_LIMIT} gacha bo'lishi kerak`);
+  if (maxSupply < MIN_SUPPLY_LIMIT || maxSupply > MAX_SUPPLY_LIMIT) {
+    throw new Error(`max_supply ${MIN_SUPPLY_LIMIT} dan ${MAX_SUPPLY_LIMIT} gacha bo'lishi kerak`);
   }
 
   const basePrice = generateInitialPrice(symbol.toUpperCase());
