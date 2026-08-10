@@ -6,6 +6,7 @@ import {
   createToken,
   getToken,
   listTopTokens,
+  getFeaturedTokens,
   listLeaderboard,
   getTokenHistory,
   getTokenChartData,
@@ -21,6 +22,7 @@ import { getFavoriteTokens, getFavoriteTokenIds, toggleFavorite } from "../servi
 import { getUserAlerts, subscribeAlert, unsubscribeAlert } from "../services/alertService";
 import { listFrozenBalances, getTotalFrozen, withdrawFrozen } from "../services/frozenService";
 import { getNexTradePrice, getNexTradePriceChart } from "../services/nexTradePriceService";
+import { getWalletInfo, sendTransfer, getTransferHistory } from "../services/walletService";
 
 export const apiRouter = Router();
 
@@ -84,6 +86,44 @@ apiRouter.post("/user/:userId/daily-bonus", ah(async (req, res) => {
 apiRouter.get("/user/:userId/balance-history", ah(async (req, res) => {
   const history = await getBalanceHistory(Number(req.params.userId));
   res.json(history);
+}));
+
+// ====== HAMYON (WALLET) - foydalanuvchilar orasida Nex Trade jo'natish ======
+
+// Hamyon kodi va balans
+apiRouter.get("/user/:userId/wallet", ah(async (req, res) => {
+  const wallet = await getWalletInfo(Number(req.params.userId));
+  res.json(wallet);
+}));
+
+// O'tkazmalar tarixi (yuborilgan/qabul qilingan)
+apiRouter.get("/user/:userId/wallet/history", ah(async (req, res) => {
+  const history = await getTransferHistory(Number(req.params.userId));
+  res.json(history);
+}));
+
+// Boshqa foydalanuvchiga hamyon kodi orqali Nex Trade jo'natish
+apiRouter.post("/wallet/transfer", ah(async (req, res) => {
+  const schema = z.object({
+    from_user_id: z.number(),
+    to_wallet_code: z.string().min(4).max(16),
+    amount: z.number().positive(),
+    note: z.string().max(140).optional(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Ma'lumotlarni to'g'ri kiriting" });
+
+  try {
+    const result = await sendTransfer(
+      parsed.data.from_user_id,
+      parsed.data.to_wallet_code,
+      parsed.data.amount,
+      parsed.data.note
+    );
+    res.json(result);
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
 }));
 
 // Yangi token yaratish
@@ -157,6 +197,12 @@ apiRouter.post("/tokens/:id/pro-upgrade", ah(async (req, res) => {
 apiRouter.get("/tokens", ah(async (req, res) => {
   const q = req.query.q as string | undefined;
   const tokens = q && q.trim() ? await searchTokens(q.trim()) : await listTopTokens();
+  res.json(tokens);
+}));
+
+// Platforma tomonidan yaratilgan "gigant" tokenlar (bozorda alohida joyda)
+apiRouter.get("/tokens/featured", ah(async (_req, res) => {
+  const tokens = await getFeaturedTokens();
   res.json(tokens);
 }));
 
