@@ -166,9 +166,10 @@ export async function notifyCreatorCommission(
   try {
     await bot.api.sendMessage(
       creatorTelegramId,
-      `💰 Sizga komissiya qo'shildi!\n\n` +
+      `💰 Sizga bonus qo'shildi!\n\n` +
         `${tokenName} ($${tokenSymbol}) tokeningizdan ${actionLabel}.\n` +
-        `Balansingizga +${commissionAmount.toFixed(4)} Nex Trade qo'shildi.`
+        `+${commissionAmount.toFixed(4)} Nex Trade "Bonuslar" jamg'armangizga qo'shildi.\n` +
+        `Ilovadagi Profil > Bonuslar bo'limidan haftada 1 marta asosiy balansingizga o'tkazib olishingiz mumkin.`
     );
   } catch (err) {
     console.error("⚠️ Yaratuvchiga komissiya xabarini yuborib bo'lmadi:", err);
