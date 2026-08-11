@@ -51,15 +51,16 @@ export async function getTradeQuote(tokenId: number, side: "buy" | "sell", amoun
   const supply = Number(token.circulating_supply);
   const maxSupply = Number(token.max_supply);
   const k = Number(token.curve_k);
+  const currentPrice = Number(token.current_price);
 
   if (side === "buy") {
     if (supply + amount > maxSupply) {
       throw new Error("Bu miqdor maksimal muomaladagi hajmdan oshib ketadi");
     }
-    const { totalCost, newPrice } = calculateBuyCost(basePrice, supply, maxSupply, k, amount);
+    const { totalCost, newPrice } = calculateBuyCost(basePrice, supply, maxSupply, k, amount, currentPrice);
     return { nexAmount: totalCost, newPrice, avgPrice: totalCost / amount };
   } else {
-    const { totalReturn, newPrice } = calculateSellReturn(basePrice, supply, maxSupply, k, amount);
+    const { totalReturn, newPrice } = calculateSellReturn(basePrice, supply, maxSupply, k, amount, currentPrice);
     return { nexAmount: totalReturn, newPrice, avgPrice: totalReturn / amount };
   }
 }

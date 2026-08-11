@@ -1,6 +1,7 @@
 import { pool } from "../db/pool";
 import { calculateBuyCost, calculateSellReturn } from "./pricingService";
 import { addFrozenAmount } from "./frozenService";
+import { addCreatorBonus } from "./bonusService";
 import { notifyCreatorCommission } from "../bot/bot";
 
 // Token yaratuvchisi o'z tokenidan max_supply ning 25% igacha, oddiy
@@ -64,12 +65,16 @@ export async function buyToken(userId: number, tokenId: number, amount: number) 
       );
     }
 
+    // token.current_price - ekranda foydalanuvchi ko'rib turgan aynan shu
+    // narx (avtomatik tebranish bilan yangilangan). Savdo shu narxdan
+    // boshlanishi uchun calculateBuyCost'ga uzatamiz (bug tuzatildi).
     const { totalCost, newSupply, newPrice } = calculateBuyCost(
       Number(token.base_price),
       Number(token.circulating_supply),
       Number(token.max_supply),
       Number(token.curve_k),
-      amount
+      amount,
+      Number(token.current_price)
     );
 
     // Komissiya: 0.25% - shundan 0.1% yaratuvchiga, 0.15% muzlatilgan fondga
@@ -92,14 +97,15 @@ export async function buyToken(userId: number, tokenId: number, amount: number) 
       [newSupply, newPrice, tokenId]
     );
 
-    // Komissiyaning 0.1% ulushi token yaratuvchisiga o'tadi (agar yaratuvchi
-    // o'zi sotib olayotgan bo'lsa ham qo'shiladi - shunda uning uchun real
-    // komissiya effektiv ravishda 0.15% ga teng bo'ladi).
+    // Komissiyaning 0.1% ulushi token yaratuvchisiga o'tadi - lekin balansga
+    // DARHOL emas, "kutilayotgan bonus" jamg'armasiga qo'shiladi (haftada
+    // 1 marta Profil > Bonuslar bo'limidan yechib olinadi).
     let creatorTelegramId: number | null = null;
     if (creatorCommission > 0) {
+      await addCreatorBonus(client, token.owner_id, creatorCommission);
       const creatorRes = await client.query(
-        "UPDATE users SET nex_trade_balance = nex_trade_balance + $1 WHERE id = $2 RETURNING telegram_id",
-        [creatorCommission, token.owner_id]
+        "SELECT telegram_id FROM users WHERE id = $1",
+        [token.owner_id]
       );
       creatorTelegramId = creatorRes.rows[0]?.telegram_id ?? null;
     }
@@ -178,7 +184,8 @@ export async function sellToken(userId: number, tokenId: number, amount: number)
       Number(token.circulating_supply),
       Number(token.max_supply),
       Number(token.curve_k),
-      amount
+      amount,
+      Number(token.current_price)
     );
 
     // Komissiya: 0.25% - shundan 0.1% yaratuvchiga, 0.15% muzlatilgan fondga.
@@ -206,13 +213,14 @@ export async function sellToken(userId: number, tokenId: number, amount: number)
       [netReturn, userId]
     );
 
-    // Komissiyaning 0.1% ulushi token yaratuvchisiga o'tadi (yaratuvchi o'zi
-    // sotayotgan bo'lsa ham qo'shiladi - effektiv komissiya 0.15% bo'ladi).
+    // Komissiyaning 0.1% ulushi token yaratuvchisiga o'tadi - balansga
+    // DARHOL emas, "kutilayotgan bonus" jamg'armasiga (haftalik yechib olish).
     let creatorTelegramId: number | null = null;
     if (creatorCommission > 0) {
+      await addCreatorBonus(client, token.owner_id, creatorCommission);
       const creatorRes = await client.query(
-        "UPDATE users SET nex_trade_balance = nex_trade_balance + $1 WHERE id = $2 RETURNING telegram_id",
-        [creatorCommission, token.owner_id]
+        "SELECT telegram_id FROM users WHERE id = $1",
+        [token.owner_id]
       );
       creatorTelegramId = creatorRes.rows[0]?.telegram_id ?? null;
     }
