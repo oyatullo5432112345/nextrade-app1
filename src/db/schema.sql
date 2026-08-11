@@ -232,3 +232,45 @@ CREATE TABLE IF NOT EXISTS wallet_transfers (
 );
 CREATE INDEX IF NOT EXISTS idx_wallet_transfers_from ON wallet_transfers(from_user_id);
 CREATE INDEX IF NOT EXISTS idx_wallet_transfers_to ON wallet_transfers(to_user_id);
+
+-- ====== NEX TRADEX TO'LDIRISH / CHIQARISH ======
+-- Avvalgi "Pul kiritish/chiqarish" (real bank kartasi) o'rniga - bu ICHKI
+-- Nex Trade valyutasini to'g'ridan-to'g'ri (real to'lovsiz) to'ldirish/
+-- chiqarish tarixi. Faqat audit/statistika uchun saqlanadi.
+CREATE TABLE IF NOT EXISTS nex_topups (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    amount NUMERIC(20, 4) NOT NULL CHECK (amount > 0),
+    uzs_value NUMERIC(20, 4) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_nex_topups_user ON nex_topups(user_id);
+
+CREATE TABLE IF NOT EXISTS nex_withdrawals (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    amount NUMERIC(20, 4) NOT NULL CHECK (amount > 0),
+    uzs_value NUMERIC(20, 4) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_nex_withdrawals_user ON nex_withdrawals(user_id);
+
+-- ====== TOKEN YARATUVCHI BONUSLARI (HAFTALIK YECHIB OLISH) ======
+-- Endi savdo komissiyasidan yaratuvchiga tegishli ulush balansga DARHOL
+-- tushmaydi - avval shu "kutilayotgan bonus" jamg'armasiga yig'iladi va
+-- foydalanuvchi Profil > Bonuslar bo'limidan FAQAT HAFTADA 1 MARTA
+-- (kamida 7 kunda bir) "Yechib olish" tugmasi orqali asosiy balansiga
+-- o'tkaza oladi. Agar bir necha hafta yechib olinmasa, bonus jamg'arilib boraveradi.
+CREATE TABLE IF NOT EXISTS creator_bonus_balance (
+    user_id INTEGER PRIMARY KEY REFERENCES users(id),
+    amount NUMERIC(20, 8) NOT NULL DEFAULT 0,
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS creator_bonus_claims (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    amount NUMERIC(20, 8) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_creator_bonus_claims_user_time ON creator_bonus_claims(user_id, created_at);
