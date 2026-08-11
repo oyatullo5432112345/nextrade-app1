@@ -346,6 +346,20 @@
   .daily-bonus-btn:disabled{
     background:var(--bg-elevated); color:var(--muted); cursor:default;
   }
+  .subtab-btn{
+    background:var(--card); border:1px solid var(--border); color:var(--muted);
+    border-radius:12px; padding:10px 8px; font-weight:700; font-size:13px; cursor:pointer;
+  }
+  .subtab-btn.active{
+    background:var(--gold); color:#1a1200; border-color:var(--gold);
+  }
+  .preset-btn{
+    background:var(--bg-elevated); border:1px solid var(--border); color:var(--text);
+    border-radius:12px; padding:12px 6px; font-weight:700; font-size:13px; cursor:pointer; text-align:center;
+  }
+  .preset-btn.active{
+    background:linear-gradient(135deg, var(--gold), var(--ember)); color:#1a1200; border-color:var(--gold);
+  }
 
   /* Token tafsilot ekrani */
   .detail-overlay{
@@ -549,9 +563,14 @@
         <div class="hint">Hamyon raqamingiz va boshqalarga Nex Trade jo'natish</div>
         <div class="referral-link num" id="wallet-code-preview" style="color:var(--gold);font-weight:700;">—</div>
       </div>
-      <div class="referral-box" id="deposit-locked-btn" style="cursor:pointer;">
-        <div style="font-weight:600;font-size:13.5px;">💳 Pul kiritish / chiqarish 🔒</div>
-        <div class="hint">Humo, Uzcard, Click, Payme orqali. Litsenziya jarayoni tugagach ochiladi.</div>
+      <div class="referral-box" id="topup-open-btn" style="cursor:pointer;background:linear-gradient(135deg, rgba(0,214,143,.12), rgba(139,124,255,.06));border-color:var(--up);">
+        <div style="font-weight:700;font-size:13.5px;">💳 Nex Tradex to'ldirish / chiqarish</div>
+        <div class="hint">Tayyor summalar bilan balansingizni to'ldiring yoki chiqaring</div>
+      </div>
+      <div class="referral-box" id="bonus-open-btn" style="cursor:pointer;background:linear-gradient(135deg, rgba(255,193,68,.12), rgba(255,122,69,.06));border-color:var(--ember);">
+        <div style="font-weight:700;font-size:13.5px;">🎁 Bonuslar</div>
+        <div class="hint">Tokeningizdan tushgan komissiya bonuslari - haftada 1 marta yechib oling</div>
+        <div class="referral-link num" id="bonus-preview" style="color:var(--ember);font-weight:700;">—</div>
       </div>
       <div class="referral-box" id="pro-locked-btn" style="cursor:pointer;">
         <div style="font-weight:600;font-size:13.5px;">💎 PRO token 🔒</div>
@@ -599,6 +618,71 @@
     </div>
   </div>
 
+  <div class="detail-overlay" id="topup-overlay">
+    <div class="detail-header">
+      <button class="back-btn" id="topup-back">←</button>
+      <div>
+        <div style="font-weight:700;font-size:15px;">Nex Tradex to'ldirish / chiqarish</div>
+        <div class="detail-meta">Ichki valyuta - real to'lov talab qilinmaydi</div>
+      </div>
+    </div>
+    <div class="detail-body">
+      <div class="tabs" style="display:flex;gap:8px;margin-bottom:14px;">
+        <button class="subtab-btn active" id="topup-tab-in" style="flex:1;">💰 To'ldirish</button>
+        <button class="subtab-btn" id="topup-tab-out" style="flex:1;">💸 Chiqarish</button>
+      </div>
+
+      <div id="topup-panel-in">
+        <div class="card">
+          <div style="font-weight:700;margin-bottom:6px;">Nex Tradex to'ldirish</div>
+          <div class="hint" style="margin-bottom:12px;">Eng kami <b id="topup-min-label">2000</b> Nex Tradex qo'shib ola olasiz. Joriy narxda bu taxminan shuncha UZS bo'ladi. Qulaylik uchun tayyor summalardan birini tanlang - hech qanday amaliyot (to'lov) talab qilinmaydi, miqdor to'g'ridan-to'g'ri balansingizga qo'shiladi.</div>
+          <div id="topup-presets-in" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;"></div>
+          <div class="field">
+            <label>Miqdor (Nex Tradex)</label>
+            <input id="topup-amount-in" type="number" placeholder="2000" min="2000" step="1" />
+          </div>
+          <div class="hint" id="topup-uzs-in" style="font-weight:600;margin-bottom:10px;">≈ 0 UZS</div>
+          <button class="primary" id="topup-submit-in">Nex Tradex to'ldirish</button>
+        </div>
+      </div>
+
+      <div id="topup-panel-out" style="display:none;">
+        <div class="card">
+          <div style="font-weight:700;margin-bottom:6px;">Nex Tradex chiqarish</div>
+          <div class="hint" style="margin-bottom:12px;">Eng kami <b id="withdraw-min-label">5000</b> Nex Tradex chiqarib olishingiz mumkin. Joriy narxda bu taxminan shuncha UZS bo'ladi.</div>
+          <div id="topup-presets-out" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;"></div>
+          <div class="field">
+            <label>Miqdor (Nex Tradex)</label>
+            <input id="topup-amount-out" type="number" placeholder="5000" min="5000" step="1" />
+          </div>
+          <div class="hint" id="topup-uzs-out" style="font-weight:600;margin-bottom:10px;">≈ 0 UZS</div>
+          <button class="primary" id="topup-submit-out">Nex Tradex chiqarish</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="detail-overlay" id="bonus-overlay">
+    <div class="detail-header">
+      <button class="back-btn" id="bonus-back">←</button>
+      <div>
+        <div style="font-weight:700;font-size:15px;">🎁 Bonuslar</div>
+        <div class="detail-meta">Tokeningizdan tushgan komissiya - haftada 1 marta yechib olinadi</div>
+      </div>
+    </div>
+    <div class="detail-body">
+      <div class="card" style="text-align:center;">
+        <div class="hint" style="margin-bottom:6px;">Kutilayotgan bonus</div>
+        <div class="num" id="bonus-pending" style="font-size:26px;font-weight:700;color:var(--ember);">0</div>
+        <div class="hint" style="margin-top:4px;">Nex Trade</div>
+      </div>
+      <div class="card" style="margin-top:14px;">
+        <div class="hint" id="bonus-status" style="margin-bottom:12px;line-height:1.6;">—</div>
+        <button class="primary" id="bonus-claim-btn">Yechib olish</button>
+      </div>
+    </div>
+  </div>
+
   <div class="detail-overlay" id="locked-overlay">
     <div class="detail-header">
       <button class="back-btn" id="locked-back">←</button>
@@ -632,16 +716,9 @@
 
     <div class="section-title">Yechib olish</div>
     <div class="card">
-      <div class="field">
-        <label>Token ID</label>
-        <input id="admin-withdraw-token-id" type="number" placeholder="Masalan: 3" min="1" />
-      </div>
-      <div class="field">
-        <label>Miqdor</label>
-        <input id="admin-withdraw-amount" type="number" placeholder="0" min="0" step="0.0001" />
-      </div>
-      <button class="primary" id="admin-withdraw-btn">Yechib olish</button>
-      <div class="hint">Yechilgan mablag' to'g'ridan-to'g'ri sizning Nex Trade balansingizga o'tkaziladi.</div>
+      <div class="hint" id="admin-withdraw-status" style="margin-bottom:12px;line-height:1.6;">—</div>
+      <button class="primary" id="admin-withdraw-all-btn">Hammasini yechib olish</button>
+      <div class="hint" style="margin-top:8px;">Hech narsa kiritish shart emas - tugmani bossangiz, barcha tokenlar bo'yicha muzlatilgan mablag' bir zumda Nex Trade'ga almashtirilib, to'g'ridan-to'g'ri balansingizga tushadi. Faqat haftada 1 marta ishlaydi.</div>
     </div>
   </section>
 </main>
@@ -791,7 +868,7 @@
       document.getElementById("screen-"+btn.dataset.tab).classList.add("active");
       if(btn.dataset.tab === "portfolio") loadPortfolio();
       if(btn.dataset.tab === "profile") loadProfile();
-      if(btn.dataset.tab === "admin") loadAdminFrozen();
+      if(btn.dataset.tab === "admin"){ loadAdminFrozen(); loadAdminWithdrawStatus(); }
     });
   });
 
@@ -835,21 +912,37 @@
     }catch(e){ toast(friendlyError(e)); }
   }
 
-  document.getElementById("admin-withdraw-btn").addEventListener("click", async ()=>{
-    const tokenId = Number(document.getElementById("admin-withdraw-token-id").value);
-    const amount = Number(document.getElementById("admin-withdraw-amount").value);
-    if(!tokenId || !amount || amount <= 0){ toast("Token ID va miqdorni to'g'ri kiriting"); return; }
+  function fmtDate(d){
+    return new Date(d).toLocaleString("uz-UZ", { day:"2-digit", month:"2-digit", year:"numeric", hour:"2-digit", minute:"2-digit" });
+  }
 
-    const btn = document.getElementById("admin-withdraw-btn");
+  async function loadAdminWithdrawStatus(){
+    if(!isAdmin) return;
+    const statusEl = document.getElementById("admin-withdraw-status");
+    const btn = document.getElementById("admin-withdraw-all-btn");
+    try{
+      const status = await api(`/admin/frozen/withdraw-status?admin_telegram_id=${currentUser.telegram_id}`);
+      if(status.canWithdraw){
+        statusEl.textContent = status.lastWithdrawnAt
+          ? `✅ Yechib olishga ruxsat bor (oxirgi marta: ${fmtDate(status.lastWithdrawnAt)})`
+          : "✅ Yechib olishga ruxsat bor";
+        btn.disabled = false;
+      }else{
+        statusEl.textContent = `⏳ Keyingi safar ${fmtDate(status.nextWithdrawAt)} da yechib olishingiz mumkin (haftada 1 marta)`;
+        btn.disabled = true;
+      }
+    }catch(e){ statusEl.textContent = friendlyError(e); }
+  }
+
+  document.getElementById("admin-withdraw-all-btn").addEventListener("click", async ()=>{
+    const btn = document.getElementById("admin-withdraw-all-btn");
     const restore = setLoading(btn, "Yechilmoqda...");
     try{
-      await api("/admin/frozen/withdraw", {
+      const result = await api("/admin/frozen/withdraw-all", {
         method: "POST",
-        body: JSON.stringify({ admin_telegram_id: currentUser.telegram_id, token_id: tokenId, amount })
+        body: JSON.stringify({ admin_telegram_id: currentUser.telegram_id })
       });
-      toast("Mablag' yechib olindi!");
-      document.getElementById("admin-withdraw-token-id").value = "";
-      document.getElementById("admin-withdraw-amount").value = "";
+      toast(`✅ ${fmtFrozen(result.withdrawnTotal)} Nex Trade yechib olindi!`);
       const refreshed = await api("/user/init", {
         method: "POST",
         body: JSON.stringify({ telegram_id: currentUser.telegram_id, username: currentUser.username })
@@ -857,6 +950,7 @@
       currentUser.nex_trade_balance = refreshed.nex_trade_balance;
       setBalance(currentUser.nex_trade_balance);
       await loadAdminFrozen();
+      await loadAdminWithdrawStatus();
     }catch(e){ toast(friendlyError(e)); }
     finally{ restore(); }
   });
@@ -1158,6 +1252,8 @@
       document.getElementById("wallet-code-preview").textContent = w.wallet_code;
     }).catch(()=>{});
 
+    loadBonusPreview();
+
     try{
       const [myTokens, referrals] = await Promise.all([
         api(`/user/${currentUser.id}/created-tokens`),
@@ -1405,13 +1501,6 @@
   });
 
   // ====== QULFLANGAN BO'LIMLAR (litsenziya kutilmoqda) ======
-  document.getElementById("deposit-locked-btn").addEventListener("click", ()=>{
-    document.getElementById("locked-title").textContent = "Pul kiritish / chiqarish";
-    document.getElementById("locked-heading").textContent = "🔒 Litsenziya olingandan keyin ochiladi";
-    document.getElementById("locked-desc").textContent =
-      "Humo, Uzcard, Click va Payme orqali pul kiritish/chiqarish uchun O'zbekiston Markaziy banki / NAPP litsenziyasi talab qilinadi. Litsenziya olingach, bu bo'lim avtomatik ishga tushadi.";
-    document.getElementById("locked-overlay").classList.add("active");
-  });
   document.getElementById("pro-locked-btn").addEventListener("click", ()=>{
     document.getElementById("locked-title").textContent = "PRO token";
     document.getElementById("locked-heading").textContent = "🔒 Litsenziya olingandan keyin ochiladi";
@@ -1463,6 +1552,168 @@
   });
   document.getElementById("wallet-back").addEventListener("click", ()=>{
     document.getElementById("wallet-overlay").classList.remove("active");
+  });
+
+  // ====== NEX TRADEX TO'LDIRISH / CHIQARISH ======
+  // Real to'lov (karta) YO'Q - bu ichki valyuta, shuning uchun tanlangan
+  // (yoki qo'lda kiritilgan) miqdor to'g'ridan-to'g'ri balansga qo'shiladi/
+  // balansdan chiqariladi. UZS qiymati faqat ma'lumot uchun ko'rsatiladi.
+  let topupInfo = null;
+  async function loadTopupInfo(){
+    if(topupInfo) return topupInfo;
+    try{
+      topupInfo = await api("/nextrade/topup-info");
+      document.getElementById("topup-min-label").textContent = fmt(topupInfo.topupMin);
+      document.getElementById("withdraw-min-label").textContent = fmt(topupInfo.withdrawMin);
+
+      document.getElementById("topup-presets-in").innerHTML = topupInfo.topupPresets.map(p =>
+        `<button class="preset-btn" data-amount="${p}">${fmt(p)}<br><span style="font-weight:500;font-size:11px;color:var(--muted);">Nex</span></button>`
+      ).join("");
+      document.getElementById("topup-presets-out").innerHTML = topupInfo.withdrawPresets.map(p =>
+        `<button class="preset-btn" data-amount="${p}">${fmt(p)}<br><span style="font-weight:500;font-size:11px;color:var(--muted);">Nex</span></button>`
+      ).join("");
+
+      document.querySelectorAll("#topup-presets-in .preset-btn").forEach(b=>{
+        b.addEventListener("click", ()=>{
+          document.querySelectorAll("#topup-presets-in .preset-btn").forEach(x=>x.classList.remove("active"));
+          b.classList.add("active");
+          document.getElementById("topup-amount-in").value = b.dataset.amount;
+          updateTopupUzs("in");
+        });
+      });
+      document.querySelectorAll("#topup-presets-out .preset-btn").forEach(b=>{
+        b.addEventListener("click", ()=>{
+          document.querySelectorAll("#topup-presets-out .preset-btn").forEach(x=>x.classList.remove("active"));
+          b.classList.add("active");
+          document.getElementById("topup-amount-out").value = b.dataset.amount;
+          updateTopupUzs("out");
+        });
+      });
+    }catch(e){ toast(friendlyError(e)); }
+    return topupInfo;
+  }
+
+  function updateTopupUzs(dir){
+    if(!topupInfo) return;
+    const amount = Number(document.getElementById(`topup-amount-${dir}`).value) || 0;
+    const uzs = amount * topupInfo.nexTradePriceUzs;
+    document.getElementById(`topup-uzs-${dir}`).textContent = `≈ ${fmt(uzs)} UZS bo'ladi (joriy narxda)`;
+  }
+  document.getElementById("topup-amount-in").addEventListener("input", ()=>updateTopupUzs("in"));
+  document.getElementById("topup-amount-out").addEventListener("input", ()=>updateTopupUzs("out"));
+
+  document.getElementById("topup-open-btn").addEventListener("click", async ()=>{
+    document.getElementById("topup-overlay").classList.add("active");
+    await loadTopupInfo();
+    updateTopupUzs("in");
+    updateTopupUzs("out");
+  });
+  document.getElementById("topup-back").addEventListener("click", ()=>{
+    document.getElementById("topup-overlay").classList.remove("active");
+  });
+  document.getElementById("topup-tab-in").addEventListener("click", ()=>{
+    document.getElementById("topup-tab-in").classList.add("active");
+    document.getElementById("topup-tab-out").classList.remove("active");
+    document.getElementById("topup-panel-in").style.display = "";
+    document.getElementById("topup-panel-out").style.display = "none";
+  });
+  document.getElementById("topup-tab-out").addEventListener("click", ()=>{
+    document.getElementById("topup-tab-out").classList.add("active");
+    document.getElementById("topup-tab-in").classList.remove("active");
+    document.getElementById("topup-panel-out").style.display = "";
+    document.getElementById("topup-panel-in").style.display = "none";
+  });
+
+  document.getElementById("topup-submit-in").addEventListener("click", async ()=>{
+    const amount = Number(document.getElementById("topup-amount-in").value);
+    if(!topupInfo || !amount || amount < topupInfo.topupMin){
+      toast(`Eng kami ${fmt(topupInfo?.topupMin ?? 2000)} Nex Tradex kiriting`); return;
+    }
+    const btn = document.getElementById("topup-submit-in");
+    const restore = setLoading(btn, "To'ldirilmoqda...");
+    try{
+      const res = await api("/nextrade/topup", {
+        method: "POST",
+        body: JSON.stringify({ user_id: currentUser.id, amount })
+      });
+      currentUser.nex_trade_balance = res.newBalance;
+      setBalance(res.newBalance);
+      toast(`✅ +${fmt(res.amount)} Nex Tradex qo'shildi (≈${fmt(res.uzsValue)} UZS)! Joriy balansda ham shuncha bo'ldi.`);
+      document.getElementById("topup-amount-in").value = "";
+      document.querySelectorAll("#topup-presets-in .preset-btn").forEach(x=>x.classList.remove("active"));
+      updateTopupUzs("in");
+    }catch(e){ toast(friendlyError(e)); }
+    finally{ restore(); }
+  });
+
+  document.getElementById("topup-submit-out").addEventListener("click", async ()=>{
+    const amount = Number(document.getElementById("topup-amount-out").value);
+    if(!topupInfo || !amount || amount < topupInfo.withdrawMin){
+      toast(`Eng kami ${fmt(topupInfo?.withdrawMin ?? 5000)} Nex Tradex kiriting`); return;
+    }
+    const btn = document.getElementById("topup-submit-out");
+    const restore = setLoading(btn, "Chiqarilmoqda...");
+    try{
+      const res = await api("/nextrade/withdraw", {
+        method: "POST",
+        body: JSON.stringify({ user_id: currentUser.id, amount })
+      });
+      currentUser.nex_trade_balance = res.newBalance;
+      setBalance(res.newBalance);
+      toast(`✅ ${fmt(res.amount)} Nex Tradex chiqarildi (≈${fmt(res.uzsValue)} UZS bo'ladi)!`);
+      document.getElementById("topup-amount-out").value = "";
+      document.querySelectorAll("#topup-presets-out .preset-btn").forEach(x=>x.classList.remove("active"));
+      updateTopupUzs("out");
+    }catch(e){ toast(friendlyError(e)); }
+    finally{ restore(); }
+  });
+
+  // ====== BONUSLAR (token yaratuvchisi komissiyasi - haftalik) ======
+  async function loadBonusPreview(){
+    try{
+      const info = await api(`/user/${currentUser.id}/bonus`);
+      document.getElementById("bonus-preview").textContent = `${fmt(info.pending)} Nex Trade kutilmoqda`;
+    }catch(e){ /* jim */ }
+  }
+
+  async function loadBonusOverlay(){
+    try{
+      const info = await api(`/user/${currentUser.id}/bonus`);
+      document.getElementById("bonus-pending").textContent = fmt(info.pending);
+      const btn = document.getElementById("bonus-claim-btn");
+      const statusEl = document.getElementById("bonus-status");
+      if(info.canClaim){
+        statusEl.textContent = "✅ Bonusingizni hozir yechib olishingiz mumkin.";
+        btn.disabled = false;
+      }else if(info.nextClaimAt){
+        statusEl.textContent = `⏳ Keyingi yechib olish ${fmtDate(info.nextClaimAt)} da mumkin bo'ladi (haftada 1 marta).`;
+        btn.disabled = true;
+      }else{
+        statusEl.textContent = "Hozircha kutilayotgan bonus yo'q. Tokeningiz bilan savdo qilinganda shu yerga bonus tushadi.";
+        btn.disabled = true;
+      }
+    }catch(e){ toast(friendlyError(e)); }
+  }
+
+  document.getElementById("bonus-open-btn").addEventListener("click", async ()=>{
+    document.getElementById("bonus-overlay").classList.add("active");
+    await loadBonusOverlay();
+  });
+  document.getElementById("bonus-back").addEventListener("click", ()=>{
+    document.getElementById("bonus-overlay").classList.remove("active");
+  });
+  document.getElementById("bonus-claim-btn").addEventListener("click", async ()=>{
+    const btn = document.getElementById("bonus-claim-btn");
+    const restore = setLoading(btn, "Yechilmoqda...");
+    try{
+      const res = await api(`/user/${currentUser.id}/bonus/claim`, { method: "POST" });
+      currentUser.nex_trade_balance = res.newBalance;
+      setBalance(res.newBalance);
+      toast(`✅ ${fmt(res.claimedAmount)} Nex Trade balansingizga o'tkazildi!`);
+      await loadBonusOverlay();
+      await loadBonusPreview();
+    }catch(e){ toast(friendlyError(e)); }
+    finally{ restore(); }
   });
   document.getElementById("wallet-send-btn").addEventListener("click", async ()=>{
     const toCode = document.getElementById("wallet-to-code").value.trim().toUpperCase();
