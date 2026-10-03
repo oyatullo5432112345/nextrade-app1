@@ -1,9 +1,9 @@
+import crypto from "crypto";
 import { pool } from "../db/pool";
 import { recordBalanceSnapshot } from "./balanceHistoryService";
 
 // .env faylida INITIAL_BALANCE, REFERRAL_BONUS, DAILY_BONUS orqali sozlash mumkin
 const INITIAL_NEX_TRADE_BALANCE = Number(process.env.INITIAL_BALANCE ?? 100);
-const REFERRAL_BONUS = Number(process.env.REFERRAL_BONUS ?? 1); // taklif qilgan va qilingan foydalanuvchiga qo'shimcha bonus
 const DAILY_BONUS = Number(process.env.DAILY_BONUS ?? 1); // har 24 soatda bir marta olinadigan bonus
 
 export interface User {
@@ -19,10 +19,15 @@ export interface User {
  * Agar referrerTelegramId berilgan bo'lsa (referal havolasi orqali kirgan bo'lsa),
  * ikkala tomonga ham qo'shimcha REFERRAL_BONUS beriladi.
  */
+function newWalletCode(): string {
+  return "NX-" + crypto.randomBytes(3).toString("hex").toUpperCase();
+}
+
 export async function getOrCreateUser(
   telegramId: number,
   username?: string,
-  referrerTelegramId?: number
+  referrerTelegramId?: number,
+  attempt = 0
 ): Promise<User> {
   const existing = await pool.query<User>(
     "SELECT * FROM users WHERE telegram_id = $1",
@@ -30,47 +35,65 @@ export async function getOrCreateUser(
   );
 
   if (existing.rows.length > 0) {
-    return { ...existing.rows[0], is_new: false } as User & { is_new: boolean };
+    const u = existing.rows[0];
+    // Telegram username o'zgargan bo'lsa yangilab qo'yamiz
+    if (username && u.username !== username) {
+      await pool.query("UPDATE users SET username = $1 WHERE id = $2", [username, u.id]);
+      u.username = username;
+    }
+    return { ...u, is_new: false } as User & { is_new: boolean };
   }
 
   const client = await pool.connect();
+  let released = false;
   try {
     await client.query("BEGIN");
 
+    // Referal: faqat kim taklif qilganini yozib qo'yamiz. Bonus endi DARHOL
+    // emas, taklif qilingan do'st BIRINCHI SAVDOSINI qilganda beriladi
+    // (engagementService.rewardReferralOnFirstTrade) - soxta akkaunt ochib
+    // bonus yig'ish foyda bermasligi uchun.
     let referrerId: number | null = null;
     if (referrerTelegramId && referrerTelegramId !== telegramId) {
       const referrer = await client.query<User>(
-        "SELECT * FROM users WHERE telegram_id = $1 FOR UPDATE",
+        "SELECT id FROM users WHERE telegram_id = $1",
         [referrerTelegramId]
       );
-      if (referrer.rows.length > 0) {
-        referrerId = referrer.rows[0].id;
-        const referrerRes = await client.query(
-          "UPDATE users SET nex_trade_balance = nex_trade_balance + $1 WHERE id = $2 RETURNING nex_trade_balance",
-          [REFERRAL_BONUS, referrerId]
-        );
-        await recordBalanceSnapshot(referrerId, referrerRes.rows[0].nex_trade_balance, client);
-      }
+      if (referrer.rows.length > 0) referrerId = referrer.rows[0].id;
     }
 
-    const initialBalance =
-      INITIAL_NEX_TRADE_BALANCE + (referrerId ? REFERRAL_BONUS : 0);
+    const initialBalance = INITIAL_NEX_TRADE_BALANCE;
 
+    // XATOLIK TUZATILDI: avval hamyon kodi SQL ichida MD5($1::text ...) bilan
+    // yasalardi - $1 bir so'rovda ham BIGINT (telegram_id), ham TEXT sifatida
+    // ishlatilgani uchun PostgreSQL "inconsistent types deduced for parameter $1"
+    // xatosini berardi va YANGI FOYDALANUVCHI UMUMAN RO'YXATDAN O'TA OLMASDI.
     const created = await client.query<User>(
       `INSERT INTO users (telegram_id, username, nex_trade_balance, referred_by, wallet_code)
-       VALUES ($1, $2, $3, $4, 'NX-' || UPPER(SUBSTRING(MD5($1::text || random()::text) FROM 1 FOR 6)))
+       VALUES ($1, $2, $3, $4, $5)
        RETURNING *`,
-      [telegramId, username ?? null, initialBalance, referrerId]
+      [telegramId, username ?? null, initialBalance, referrerId, newWalletCode()]
     );
     await recordBalanceSnapshot(created.rows[0].id, created.rows[0].nex_trade_balance, client);
 
     await client.query("COMMIT");
     return { ...created.rows[0], is_new: true } as User & { is_new: boolean };
-  } catch (err) {
+  } catch (err: any) {
     await client.query("ROLLBACK");
+    // Bir vaqtda ikkita so'rov kelib, foydalanuvchi allaqachon yaratilgan bo'lsa
+    // Juda kam holatda tasodifiy hamyon kodi takrorlansa - qayta urinamiz
+    if (err?.code === "23505" && String(err?.constraint ?? "").includes("wallet_code") && attempt < 5) {
+      client.release();
+      released = true;
+      return getOrCreateUser(telegramId, username, referrerTelegramId, attempt + 1);
+    }
+    if (err?.code === "23505") {
+      const again = await pool.query<User>("SELECT * FROM users WHERE telegram_id = $1", [telegramId]);
+      if (again.rows.length > 0) return { ...again.rows[0], is_new: false } as User & { is_new: boolean };
+    }
     throw err;
   } finally {
-    client.release();
+    if (!released) client.release();
   }
 }
 
@@ -122,10 +145,17 @@ export async function claimDailyBonus(
 
 export async function getUserHoldings(userId: number) {
   const result = await pool.query(
-    `SELECT h.token_id, t.name, t.symbol, t.image_url, h.amount, t.current_price
-     FROM holdings h
-     JOIN tokens t ON t.id = h.token_id
-     WHERE h.user_id = $1 AND h.amount > 0`,
+    // in_orders - sotuv buyurtmalarida turgan (vaqtincha muzlatilgan) tokenlar
+    `SELECT * FROM (
+       SELECT h.token_id, t.name, t.symbol, t.image_url, h.amount, h.avg_cost, t.current_price,
+              COALESCE((SELECT SUM(o.amount - o.filled) FROM orders o
+                        WHERE o.user_id = h.user_id AND o.token_id = h.token_id AND o.status = 'open' AND o.side = 'sell'), 0) AS in_orders
+       FROM holdings h
+       JOIN tokens t ON t.id = h.token_id
+       WHERE h.user_id = $1
+     ) x
+     WHERE amount > 0 OR in_orders > 0
+     ORDER BY ((amount + in_orders) * current_price) DESC`,
     [userId]
   );
   return result.rows;
@@ -147,9 +177,12 @@ export async function getReferralCount(userId: number): Promise<number> {
  */
 export async function getUserLeaderboard(limit = 10) {
   const result = await pool.query(
-    `SELECT id, username, nex_trade_balance
+    // Xarid buyurtmalarida muzlatilgan Nex ham foydalanuvchiniki - hisobga olinadi
+    `SELECT id, username, nex_trade_balance + COALESCE(
+              (SELECT SUM(locked_nex) FROM orders o WHERE o.user_id = users.id AND o.status = 'open'), 0) AS nex_trade_balance
      FROM users
-     ORDER BY nex_trade_balance DESC
+     WHERE telegram_id > 0
+     ORDER BY 3 DESC
      LIMIT $1`,
     [limit]
   );
@@ -162,7 +195,7 @@ export async function getPlatformStats() {
       (SELECT COUNT(*)::int FROM users) AS total_users,
       (SELECT COUNT(*)::int FROM tokens) AS total_tokens,
       (SELECT COALESCE(SUM(nex_trade_balance), 0) FROM users) AS total_nex_trade_circulating,
-      (SELECT COUNT(*)::int FROM transactions) AS total_trades,
+      (SELECT COUNT(*)::int FROM transactions WHERE tape = true) AS total_trades,
       (SELECT COALESCE(SUM(total_cost), 0) FROM transactions WHERE type = 'buy') AS total_volume
   `);
   return result.rows[0];

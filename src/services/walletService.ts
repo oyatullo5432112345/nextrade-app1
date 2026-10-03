@@ -1,5 +1,6 @@
 import { pool } from "../db/pool";
 import { recordBalanceSnapshot } from "./balanceHistoryService";
+import { floor4 } from "./pricingService";
 
 const MIN_TRANSFER = 0.0001;
 
@@ -24,36 +25,35 @@ export async function getWalletInfo(userId: number) {
 export async function sendTransfer(
   fromUserId: number,
   toWalletCode: string,
-  amount: number,
+  rawAmount: number,
   note?: string
 ) {
+  const amount = floor4(rawAmount);
   if (!amount || amount < MIN_TRANSFER) {
     throw new Error("Miqdor juda kichik");
   }
+  const code = toWalletCode.trim().toUpperCase();
 
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
 
-    // Ikkala qatorni ham (jo'natuvchi va qabul qiluvchi) ID tartibida
-    // qulflaymiz - deadlock bo'lmasligi uchun har doim bir xil tartibda.
-    const senderRes = await client.query(
-      "SELECT id, wallet_code, nex_trade_balance FROM users WHERE id = $1 FOR UPDATE",
-      [fromUserId]
-    );
-    if (senderRes.rows.length === 0) throw new Error("Foydalanuvchi topilmadi");
-    const sender = senderRes.rows[0];
+    const receiverLookup = await client.query("SELECT id FROM users WHERE wallet_code = $1", [code]);
+    if (receiverLookup.rows.length === 0) throw new Error("Bunday hamyon kodi topilmadi");
+    const receiverId = Number(receiverLookup.rows[0].id);
+    if (receiverId === fromUserId) throw new Error("O'zingizga pul jo'nata olmaysiz");
 
-    if (sender.wallet_code === toWalletCode.trim().toUpperCase()) {
-      throw new Error("O'zingizga pul jo'nata olmaysiz");
-    }
-
-    const receiverRes = await client.query(
-      "SELECT id, wallet_code, nex_trade_balance FROM users WHERE wallet_code = $1 FOR UPDATE",
-      [toWalletCode.trim().toUpperCase()]
+    // XATOLIK TUZATILDI: ikkala qatorni ID tartibida qulflaymiz. Avval
+    // izohda shunday deyilgan, lekin kodda qilinmagan edi - A->B va B->A
+    // o'tkazmalari bir vaqtda kelsa deadlock bo'lardi.
+    const locked = await client.query(
+      "SELECT id, wallet_code, nex_trade_balance FROM users WHERE id = ANY($1::int[]) ORDER BY id FOR UPDATE",
+      [[fromUserId, receiverId]]
     );
-    if (receiverRes.rows.length === 0) throw new Error("Bunday hamyon kodi topilmadi");
-    const receiver = receiverRes.rows[0];
+    const sender = locked.rows.find((r) => Number(r.id) === fromUserId);
+    const receiver = locked.rows.find((r) => Number(r.id) === receiverId);
+    if (!sender) throw new Error("Foydalanuvchi topilmadi");
+    if (!receiver) throw new Error("Bunday hamyon kodi topilmadi");
 
     if (Number(sender.nex_trade_balance) < amount) {
       throw new Error("Balansda yetarli Nex Trade yo'q");
@@ -76,10 +76,15 @@ export async function sendTransfer(
       [sender.id, receiver.id, amount, note?.slice(0, 140) ?? null]
     );
 
+    const receiverTg = await client.query("SELECT telegram_id FROM users WHERE id = $1", [receiver.id]);
+
     await client.query("COMMIT");
     return {
+      amount,
       newBalance: senderUpdate.rows[0].nex_trade_balance,
       receiverWalletCode: receiver.wallet_code,
+      senderWalletCode: sender.wallet_code,
+      receiverTelegramId: Number(receiverTg.rows[0]?.telegram_id ?? 0),
     };
   } catch (err) {
     await client.query("ROLLBACK");

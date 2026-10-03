@@ -70,3 +70,47 @@ export async function updateLastNotifiedPrice(alertId: number, price: number) {
     alertId,
   ]);
 }
+
+/**
+ * XATOLIK TUZATILDI: foydalanuvchi 🔔 tugmasini bosib obuna bo'lardi, lekin
+ * bildirishnoma HECH QACHON yuborilmasdi - getAlertsForToken() yozilgan,
+ * ammo hech qayerda chaqirilmagan edi.
+ *
+ * Endi har tikda (10 soniya) narxi obuna paytidagi / oxirgi xabardagi
+ * narxdan threshold_pct foizdan ko'proq o'zgargan obunalar topiladi va
+ * botdan xabar yuboriladi.
+ */
+export async function checkPriceAlerts() {
+  const { rows } = await pool.query(
+    `SELECT a.id, a.threshold_pct, a.last_notified_price, u.telegram_id,
+            t.id AS token_id, t.name, t.symbol, t.current_price
+     FROM token_alerts a
+     JOIN tokens t ON t.id = a.token_id
+     JOIN users u ON u.id = a.user_id
+     WHERE a.last_notified_price IS NOT NULL
+       AND a.last_notified_price > 0
+       AND ABS(t.current_price - a.last_notified_price) / a.last_notified_price * 100 >= a.threshold_pct
+     LIMIT 25`
+  );
+  if (rows.length === 0) return;
+
+  const { sendTelegramMessage } = await import("../bot/bot");
+
+  for (const r of rows) {
+    const oldP = Number(r.last_notified_price);
+    const newP = Number(r.current_price);
+    const pct = ((newP - oldP) / oldP) * 100;
+    const arrow = pct >= 0 ? "📈" : "📉";
+
+    // Avval yangilaymiz - xabar yuborilmasa ham qayta-qayta urinib spam qilmaslik uchun
+    await updateLastNotifiedPrice(r.id, newP);
+
+    if (Number(r.telegram_id) > 0) {
+      await sendTelegramMessage(
+        Number(r.telegram_id),
+        `${arrow} ${r.name} ($${r.symbol}) narxi ${pct >= 0 ? "+" : ""}${pct.toFixed(1)}% o'zgardi\n\n` +
+          `${oldP.toFixed(4)} → ${newP.toFixed(4)}`
+      );
+    }
+  }
+}

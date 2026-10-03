@@ -36,34 +36,29 @@ export async function getNexTradePriceChart(limit = 100) {
   return result.rows.reverse(); // eskidan yangiga - grafik uchun qulay
 }
 
-/**
- * Bir tik (tasodifiy tebranish) - priceFluctuationService tomonidan
- * tokenlar bilan bir vaqtda (har 10 soniyada) chaqiriladi.
- */
-export async function tickNexTradePrice(maxChangePct: number) {
-  const client = await pool.connect();
-  try {
-    const current = await client.query(
-      "SELECT price FROM nex_trade_price WHERE id = 1 FOR UPDATE"
-    );
-    const oldPrice = current.rows.length > 0
-      ? Number(current.rows[0].price)
-      : NEX_TRADE_STARTING_PRICE;
+// NEX NARXI NAZORATI (v9): narx tasodifan cheksiz "suzib" ketmasligi uchun
+// maqsadli narxga (NEX_TARGET_UZS) asta qaytadi va ±NEX_BAND oralig'idan chiqmaydi.
+export const NEX_TARGET_UZS = Number(process.env.NEX_TARGET_UZS ?? NEX_TRADE_STARTING_PRICE);
+export const NEX_BAND = Number(process.env.NEX_BAND ?? 0.05); // ±5%
+const NEX_PULL = 0.03; // har tikda farqning 3% i qaytariladi
 
-    const pct = (Math.random() * 2 - 1) * maxChangePct;
-    let newPrice = oldPrice * (1 + pct);
-    if (newPrice < NEX_TRADE_MIN_PRICE) newPrice = NEX_TRADE_MIN_PRICE;
+export function nextNexPrice(oldPrice: number, maxChangePct: number, rnd = Math.random()) {
+  const pct = (rnd * 2 - 1) * maxChangePct;
+  let p = oldPrice * (1 + pct);
+  p += (NEX_TARGET_UZS - p) * NEX_PULL;
+  const lo = NEX_TARGET_UZS * (1 - NEX_BAND), hi = NEX_TARGET_UZS * (1 + NEX_BAND);
+  return Math.min(hi, Math.max(lo, Math.max(p, NEX_TRADE_MIN_PRICE)));
+}
 
-    await client.query(
-      `INSERT INTO nex_trade_price (id, price, updated_at) VALUES (1, $1, NOW())
-       ON CONFLICT (id) DO UPDATE SET price = $1, updated_at = NOW()`,
-      [newPrice]
-    );
-    await client.query(
-      "INSERT INTO nex_trade_price_ticks (price) VALUES ($1)",
-      [newPrice]
-    );
-  } finally {
-    client.release();
-  }
+/** Bir tik - jobs.ts tomonidan har 10 soniyada chaqiriladi. */
+export async function tickNexTradePrice(maxChangePct: number, record = true) {
+  const current = await pool.query("SELECT price FROM nex_trade_price WHERE id = 1");
+  const oldPrice = current.rows.length > 0 ? Number(current.rows[0].price) : NEX_TRADE_STARTING_PRICE;
+  const newPrice = nextNexPrice(oldPrice, maxChangePct);
+  await pool.query(
+    `INSERT INTO nex_trade_price (id, price, updated_at) VALUES (1, $1, NOW())
+     ON CONFLICT (id) DO UPDATE SET price = $1, updated_at = NOW()`,
+    [newPrice]
+  );
+  if (record) await pool.query("INSERT INTO nex_trade_price_ticks (price) VALUES ($1)", [newPrice]);
 }
