@@ -10,6 +10,7 @@ import { apiRouter } from "./routes/api";
 import { ipLimiter } from "./middleware/rateLimit";
 import { bot, setupBotMenu, promoSender, autoRestoreFromTelegram } from "./bot/bot";
 import { startPromoScheduler } from "./services/promoService";
+import { upgradeAllTokenSupplies } from "./services/tokenService";
 import { startJobs } from "./jobs";
 import { seedAllGenesis } from "./services/orderBookService";
 import { ensureSchema } from "./db/ensureSchema";
@@ -105,6 +106,10 @@ async function bootstrap() {
 
   // Eski tokenlar uchun order book (platforma sotuv zinapoyasi) - bir marta
   await seedAllGenesis().catch((err) => console.error("❌ Order book'ga o'tkazishda xato:", err));
+  // v14: eski tokenlar 1 000 000 ga ko'tariladi (har ishga tushganda tekshiradi, bajarilganlarini o'tkazib yuboradi)
+  if (process.env.SUPPLY_UPGRADE !== "false") {
+    await upgradeAllTokenSupplies().catch((err) => console.error("❌ Token miqdorini ko'tarishda xato:", err));
+  }
 
   // Fon vazifalari bot ishga tushishidan MUSTAQIL ishlaydi (Telegram vaqtincha
   // javob bermasa ham liga, zaxira, IPO va h.k. to'xtab qolmasin)

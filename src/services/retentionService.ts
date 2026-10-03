@@ -95,22 +95,23 @@ function monthStartSql(offset: number) {
   return `((date_trunc('month', NOW() AT TIME ZONE '${TZ}') + INTERVAL '${offset} month') AT TIME ZONE '${TZ}')::timestamp`;
 }
 
-async function seasonTop(fromSql: string, toSql: string, limit: number, runner: any = pool) {
+async function seasonTop(fromSql: string, toSql: string, limit: number, runner: any = pool, includeBots = false) {
   const { rows } = await runner.query(
-    `SELECT u.id AS user_id, u.username, SUM(t.realized_pnl) AS pnl
+    `SELECT u.id AS user_id, u.username, u.is_bot, SUM(t.realized_pnl) AS pnl
      FROM transactions t JOIN users u ON u.id = t.user_id
      WHERE t.type = 'sell' AND t.realized_pnl IS NOT NULL
-       AND t.created_at >= ${fromSql} AND t.created_at < ${toSql} AND u.telegram_id > 0
-     GROUP BY u.id, u.username
+       AND t.created_at >= ${fromSql} AND t.created_at < ${toSql} AND (u.telegram_id > 0 OR ($2::boolean AND u.is_bot = true))
+     GROUP BY u.id, u.username, u.is_bot
      HAVING SUM(t.realized_pnl) >= 1 AND COUNT(*) >= 5
      ORDER BY pnl DESC LIMIT $1`,
-    [limit]
+    [limit, includeBots]
   );
-  return rows.map((r: any, i: number) => ({ rank: i + 1, userId: Number(r.user_id), username: r.username, pnl: Number(r.pnl) }));
+  return rows.map((r: any, i: number) => ({ rank: i + 1, userId: Number(r.user_id), username: r.username, isBot: Boolean(r.is_bot), pnl: Number(r.pnl) }));
 }
 
 export async function getSeason() {
-  const top = await seasonTop(monthStartSql(0), monthStartSql(1), 10);
+  const top = await seasonTop(monthStartSql(0), monthStartSql(1), 10, pool, true);
+  let realIdx = 0;
   const meta = await pool.query(
     `SELECT (${monthStartSql(1)})::timestamptz AS ends_at, to_char(NOW() AT TIME ZONE '${TZ}', 'YYYY-MM') AS key`
   );
@@ -122,7 +123,7 @@ export async function getSeason() {
     key: meta.rows[0].key,
     endsAt: meta.rows[0].ends_at,
     prizes: SEASON_PRIZES,
-    top: top.map((t: any) => ({ rank: t.rank, username: t.username, pnl: t.pnl, prize: SEASON_PRIZES[t.rank - 1] ?? 0 })),
+    top: top.map((t: any) => ({ rank: t.rank, username: t.username, isBot: t.isBot, pnl: t.pnl, prize: t.isBot ? 0 : (SEASON_PRIZES[realIdx++] ?? 0) })),
     lastChampions: last.rows.map((r) => ({ rank: r.rank, username: r.username, reward: Number(r.reward) })),
   };
 }
@@ -185,7 +186,8 @@ export async function getAdminStats() {
         (SELECT COUNT(*)::int FROM tokens WHERE is_hidden = false AND owner_id <> (SELECT id FROM users WHERE telegram_id = -1)) AS tokens,
         (SELECT COUNT(*)::int FROM transactions WHERE tape = true AND created_at >= ${today}) AS trades_today,
         (SELECT COALESCE(SUM(total_cost), 0) FROM transactions WHERE tape = true AND created_at >= ${today}) AS volume_today,
-        (SELECT COUNT(*)::int FROM promo_chats WHERE is_active) AS promo_chats,
+        (SELECT COUNT(*)::int FROM promo_chats WHERE is_active AND is_bot = false) AS promo_chats,
+        (SELECT COUNT(*)::int FROM users WHERE is_bot = true) AS bots,
         (SELECT COALESCE(SUM(stars), 0)::int FROM stars_payments) AS stars_total,
         (SELECT COUNT(*)::int FROM users WHERE bot_blocked) AS blocked_bot
     `),

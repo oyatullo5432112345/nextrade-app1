@@ -614,3 +614,10 @@ CREATE TABLE IF NOT EXISTS group_members (
     PRIMARY KEY (chat_id, telegram_id)
 );
 CREATE INDEX IF NOT EXISTS idx_group_members_pick ON group_members(chat_id, last_tagged_at);
+
+-- ================================================================
+-- v15: ochiq belgilangan bot-o'yinchilar (🤖), bot-klanlar va bot-guruhlar
+-- ================================================================
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_bot BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE promo_chats ADD COLUMN IF NOT EXISTS is_bot BOOLEAN NOT NULL DEFAULT false;
+CREATE INDEX IF NOT EXISTS idx_users_is_bot ON users(is_bot) WHERE is_bot = true;

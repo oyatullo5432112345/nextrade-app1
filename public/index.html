@@ -615,6 +615,7 @@
   .ob-empty{ color:var(--muted); text-align:center; padding:6px; font-size:12px; }
   .tape-row{ display:flex; justify-content:space-between; gap:8px; font-size:12px; padding:5px 0; border-top:1px solid var(--border); font-family:'Space Grotesk',sans-serif; }
   .tape-row .t{ color:var(--muted); }
+  .bot-pill{ display:inline-block; margin-left:5px; padding:1px 6px; border-radius:999px; font-size:9.5px; font-weight:800; background:rgba(139,124,255,.16); color:var(--violet); vertical-align:middle; }
   .ob-tabs{ display:flex; gap:6px; margin-bottom:8px; }
   .ob-tabs button{ flex:1; background:var(--bg-elevated); border:1px solid var(--border); color:var(--muted); border-radius:8px; padding:6px; font-size:12px; font-weight:700; }
   .ob-tabs button.active{ color:var(--text); border-color:var(--violet); }
@@ -901,11 +902,11 @@
       <input id="new-image" type="hidden" />
       <div class="field">
         <label>Nechta token chiqariladi</label>
-        <input id="new-supply" type="text" inputmode="numeric" placeholder="100 000" value="100000" />
+        <input id="new-supply" type="text" inputmode="numeric" placeholder="1 000 000" value="1000000" />
         <div class="chips" id="supply-chips">
-          <button data-v="1000">1 000</button><button data-v="10000">10 000</button><button data-v="100000" class="active">100 000</button><button data-v="1000000">1 000 000</button>
+          <button data-v="100000">100 000</button><button data-v="250000">250 000</button><button data-v="500000">500 000</button><button data-v="1000000" class="active">1 000 000</button>
         </div>
-        <div class="hint" id="supply-hint" style="margin-top:6px;">10 dan 1 000 000 gacha. Ko'p token - har biri arzonroq, ko'proq odam sotib oladi.</div>
+        <div class="hint" id="supply-hint" style="margin-top:6px;">100 000 dan 1 000 000 gacha. Ko'p token - har biri arzonroq, ko'proq odam sotib oladi.</div>
       </div>
       <div class="backing-box">
         <div style="font-weight:800;font-size:13.5px;">🛡 Boshlang'ich qiymat (ixtiyoriy)</div>
@@ -3422,6 +3423,12 @@
 
   // --- Haftalik liga
   let leagueTimer = null;
+  // 🤖 bot-o'yinchilar ochiq belgilanadi va mukofot olmaydi
+  function uname(u, fallback){
+    if(!u || !u.username) return fallback || tr("Foydalanuvchi");
+    if(u.isBot || u.is_bot || String(u.username).startsWith("🤖")) return `${esc(u.username)}<span class="bot-pill">${tr("bot")}</span>`;
+    return "@" + esc(u.username);
+  }
   async function loadLeague(){
     try{
       const L = await api("/league");
@@ -3447,15 +3454,16 @@
         meEl.textContent = "Bu hafta hali foyda bilan sotmadingiz";
       }
       document.getElementById("league-rules").textContent =
-        `Reytingga kirish uchun: haftada kamida ${L.minSells} ta sotuv va +${L.minPnl} Nex foyda.`;
+        `Reytingga kirish uchun: haftada kamida ${L.minSells} ta sotuv va +${L.minPnl} Nex foyda.` +
+        (L.players ? ` 👥 ${fmt(L.players.real)} ${tr("o'yinchi")}` + (L.players.bots ? ` · 🤖 ${fmt(L.players.bots)} ${tr("bot (mukofot olmaydi)")}` : "") : "");
 
       const list = document.getElementById("league-list");
       const medals = ["🥇","🥈","🥉"];
       list.innerHTML = L.top.length ? L.top.map(u=>`
         <div class="league-row ${u.isMe ? "me" : ""}">
           <div class="league-rank">${medals[u.rank-1] || u.rank}</div>
-          <div class="league-name">${u.username ? "@" + esc(u.username) : "Foydalanuvchi"}${u.isMe ? " (siz)" : ""}</div>
-          <div><div class="league-pnl">+${fmt(u.pnl)}</div><div class="league-prize">🎁 ${fmt(u.prize)}</div></div>
+          <div class="league-name">${uname(u)}${u.isMe ? " (siz)" : ""}</div>
+          <div><div class="league-pnl">+${fmt(u.pnl)}</div>${u.prize ? `<div class="league-prize">🎁 ${fmt(u.prize)}</div>` : u.isBot ? `<div class="league-prize" style="color:var(--muted);">${tr("mukofotsiz")}</div>` : ""}</div>
         </div>`).join("")
         : `<div class="empty"><div class="empty-icon">🏆</div><div class="empty-title">Hali hech kim yo'q</div><div class="empty-sub">Birinchi bo'lib foyda bilan soting va 1-o'rinni egallang!</div></div>`;
 
@@ -3612,7 +3620,7 @@
         box.innerHTML = rows.length
           ? `<div class="ob-head"><span>${tr("Narx")}</span><span>${tr("Miqdor")}</span><span>${tr("Vaqt")}</span></div>` +
             rows.map(r=> `<div class="tape-row">
-              <span style="color:${r.side === "buy" ? "var(--up)" : "var(--down)"};font-weight:700;">${px(r.price)}</span>
+              <span style="color:${r.side === "buy" ? "var(--up)" : "var(--down)"};font-weight:700;">${px(r.price)}${r.bot ? ` <span title="bot-o'yinchi">🤖</span>` : ""}</span>
               <span>${fmt(r.amount)}</span>
               <span class="t">${timeAgo(r.created_at)}</span>
             </div>`).join("")
@@ -4017,7 +4025,7 @@
       document.getElementById("season-list").innerHTML = S.top.length ? S.top.map(u=>`
         <div class="league-row">
           <div class="league-rank">${MEDALS[u.rank-1] || u.rank}</div>
-          <div class="league-name">${u.username ? "@" + esc(u.username) : "—"}</div>
+          <div class="league-name">${uname(u, "—")}</div>
           <div><div class="league-pnl">+${fmt(u.pnl)}</div>${u.prize ? `<div class="league-prize">🎁 ${fmt(u.prize)}</div>` : ""}</div>
         </div>`).join("")
         : `<div class="empty"><div class="empty-icon">👑</div><div class="empty-title">${tr("Hali hech kim yo'q")}</div></div>`;
@@ -4035,7 +4043,7 @@
       list.innerHTML = G.length ? G.map(g=>`
         <div class="league-row">
           <div class="league-rank">${MEDALS[g.rank-1] || g.rank}</div>
-          <div class="league-name">${esc(g.title || "Guruh")}<div class="hint" style="margin:0;">👥 ${g.members}</div></div>
+          <div class="league-name">${esc(g.title || "Guruh")}${g.isBot ? `<span class="bot-pill">${tr("bot")}</span>` : ""}<div class="hint" style="margin:0;">👥 ${g.members}</div></div>
           <div class="league-pnl" style="color:${g.pnl >= 0 ? "var(--up)" : "var(--down)"};">${g.pnl >= 0 ? "+" : ""}${fmt(g.pnl)}</div>
         </div>`).join("")
         : `<div class="empty"><div class="empty-icon">🏟</div><div class="empty-title">${tr("Hali guruhlar yo'q")}</div><div class="empty-sub">${tr("Botni guruhingizga qo'shing va /qoshil yozing")}</div></div>`;
@@ -4051,7 +4059,7 @@
           <div class="clan-card">
             <div style="font-weight:700;font-size:16px;"><span class="clan-tag">${esc(C.tag)}</span>${esc(C.name)}</div>
             <div class="hint">👥 ${C.members.length}/${C.maxMembers} · ${tr("Shu hafta")}: <b style="color:${C.weekPnl >= 0 ? "var(--up)" : "var(--down)"};">${C.weekPnl >= 0 ? "+" : ""}${fmt(C.weekPnl)} Nex</b></div>
-            <div style="margin-top:10px;">${C.members.map(m=>`<div class="holder-row"><span>${m.isOwner ? "👑 " : ""}${m.username ? "@" + esc(m.username) : "—"}</span><span class="num">${m.pnl >= 0 ? "+" : ""}${fmt(m.pnl)}</span></div>`).join("")}</div>
+            <div style="margin-top:10px;">${C.members.map(m=>`<div class="holder-row"><span>${m.isOwner ? "👑 " : ""}${uname(m, "—")}</span><span class="num">${m.pnl >= 0 ? "+" : ""}${fmt(m.pnl)}</span></div>`).join("")}</div>
             <div class="hint" style="margin-top:10px;">${tr("Do'stlaringizni chaqiring")}: <b>${esc(C.tag)}</b> ${tr("belgisi bilan qo'shiladi")}</div>
             <button class="ghost" id="clan-leave" style="margin-top:10px;">${tr("Klandan chiqish")}</button>
           </div>`;
@@ -4094,7 +4102,7 @@
       document.getElementById("clans-list").innerHTML = top.clans.length ? top.clans.map(c=>`
         <div class="league-row">
           <div class="league-rank">${MEDALS[c.rank-1] || c.rank}</div>
-          <div class="league-name"><span class="clan-tag">${esc(c.tag)}</span>${esc(c.name)}<div class="hint" style="margin:0;">👥 ${c.members}</div></div>
+          <div class="league-name"><span class="clan-tag">${esc(c.tag)}</span>${esc(c.name)}${c.isBot ? `<span class="bot-pill">${tr("bot")}</span>` : ""}<div class="hint" style="margin:0;">👥 ${c.members}</div></div>
           <div class="league-pnl" style="color:${c.pnl >= 0 ? "var(--up)" : "var(--down)"};">${c.pnl >= 0 ? "+" : ""}${fmt(c.pnl)}</div>
         </div>`).join("")
         : `<div class="hint" style="padding:10px 0;">${tr("Hali klanlar yo'q - birinchi bo'ling!")}</div>`;
@@ -4197,12 +4205,13 @@
     "🏆 Liga, mavsum, klanlar va do'stlar →":"🏆 Лига, сезон, кланы и друзья →","✅ So'rov qabul qilindi":"✅ Запрос принят",
   });
   Object.assign(RU, {
+    "bot":"бот","mukofotsiz":"без приза","o'yinchi":"игроков","bot (mukofot olmaydi)":"ботов (без призов)",
     "Tokeningiz qisqacha":"Ваш токен коротко","Jami chiqariladi":"Всего выпускается","Boshlang'ich narx":"Стартовая цена",
     "Boshlang'ich bozor qiymati":"Стартовая капитализация","👑 Siz ega bo'la olasiz":"👑 Вы можете владеть","👥 Har bir xaridor":"👥 Каждый покупатель",
-    "💰 Har savdodan sizga":"💰 Вам с каждой сделки","ko'pi bilan":"максимум","10 dan 1 000 000 gacha":"от 10 до 1 000 000",
+    "💰 Har savdodan sizga":"💰 Вам с каждой сделки","ko'pi bilan":"максимум","100 000 dan 1 000 000 gacha":"от 100 000 до 1 000 000",
     "Bitta odam hammasini sotib ololmaydi - shuning uchun tokeningiz ko'p odamga tarqaladi va narxni bozor belgilaydi.":"Один человек не может скупить всё - поэтому токен расходится по многим людям, а цену определяет рынок.",
-    "10 dan 1 000 000 gacha. Ko'p token - har biri arzonroq, ko'proq odam sotib oladi.":"От 10 до 1 000 000. Больше токенов - каждый дешевле, больше людей купят.",
-    "Miqdor 10 dan 1 000 000 gacha bo'lsin":"Количество от 10 до 1 000 000","Bugun":"Сегодня","joy qoldi":"мест осталось",
+    "100 000 dan 1 000 000 gacha. Ko'p token - har biri arzonroq, ko'proq odam sotib oladi.":"От 100 000 до 1 000 000. Больше токенов - каждый дешевле, больше людей купят.",
+    "Miqdor 100 000 dan 1 000 000 gacha bo'lsin":"Количество от 100 000 до 1 000 000","Bugun":"Сегодня","joy qoldi":"мест осталось",
     "Bugungi joylar tugadi - ertaga 00:00 da ochiladi":"Места на сегодня закончились - откроются завтра в 00:00","Bugungi joylar tugadi":"Места на сегодня закончились",
     "platforma likvidligi (kunlik limit bilan)": "ликвидность платформы (с дневным лимитом)",
     "🤖 Nex AI tavsiyalari":"🤖 Рекомендации Nex AI","🤖 Nex AI tahlili":"🤖 Анализ Nex AI","Bozor tahlilchisi":"Аналитик рынка",
@@ -4434,7 +4443,7 @@
   }
 
   // --- Token yaratish ekrani
-  let createInfo = { fee: 50, maxPerUser: 3, maxBacking: 100000, minSupply: 10, maxSupply: 1000000, creatorPct: 0.3, userPct: 0.2, slots: null };
+  let createInfo = { fee: 50, maxPerUser: 3, maxBacking: 100000, minSupply: 100000, maxSupply: 1000000, creatorPct: 0.3, userPct: 0.2, slots: null };
   const pctTxt = (p)=> `${Math.round(Number(p) * 100)}%`;
   function renderSlots(){
     const s = createInfo.slots, bar = document.getElementById("slots-bar");
@@ -4486,10 +4495,10 @@
     clearTimeout(createPreviewT);
     createPreviewT = setTimeout(async ()=>{
       const sym = document.getElementById("new-symbol").value.trim() || "X";
-      const supply = num(document.getElementById("new-supply").value) || 100000;
+      const supply = num(document.getElementById("new-supply").value) || 1000000;
       const okSupply = supply >= createInfo.minSupply && supply <= createInfo.maxSupply;
       const symTxt = sym === "X" ? "" : ` $${sym}`;
-      document.getElementById("ts-supply").textContent = okSupply ? `${fmt(Math.round(supply))}${symTxt}` : tr("10 dan 1 000 000 gacha");
+      document.getElementById("ts-supply").textContent = okSupply ? `${fmt(Math.round(supply))}${symTxt}` : tr("100 000 dan 1 000 000 gacha");
       document.getElementById("ts-own").textContent = okSupply ? `${pctTxt(createInfo.creatorPct)} · ${fmt(Math.floor(supply * createInfo.creatorPct))} ${tr("ta")}` : "—";
       document.getElementById("ts-user").textContent = okSupply ? `${tr("ko'pi bilan")} ${pctTxt(createInfo.userPct)} · ${fmt(Math.floor(supply * createInfo.userPct))} ${tr("ta")}` : "—";
       if(!okSupply) return;
@@ -4572,7 +4581,7 @@
     const backing = Number(document.getElementById("new-backing").value) || 0;
     if(!name){ toast(tr("Token nomini kiriting")); document.getElementById("new-name").focus(); return; }
     if(!/^[A-Z0-9]{2,10}$/.test(symbol)){ toast(tr("Belgi 2-10 ta lotin harf/raqam bo'lsin")); document.getElementById("new-symbol").focus(); return; }
-    if(!(supply >= createInfo.minSupply && supply <= createInfo.maxSupply)){ toast(tr("Miqdor 10 dan 1 000 000 gacha bo'lsin")); return; }
+    if(!(supply >= createInfo.minSupply && supply <= createInfo.maxSupply)){ toast(tr("Miqdor 100 000 dan 1 000 000 gacha bo'lsin")); return; }
     const btn = document.getElementById("create-btn");
     const restore = setLoading(btn, tr("Yaratilmoqda..."));
     try{

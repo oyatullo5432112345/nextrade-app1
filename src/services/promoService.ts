@@ -104,7 +104,7 @@ export function formatInterval(minutes: number) {
 export async function listPromoChats() {
   const { rows } = await pool.query(
     `SELECT chat_id, title, chat_type, is_active, interval_minutes, posts_sent, last_post_at
-     FROM promo_chats ORDER BY is_active DESC, posts_sent DESC`
+     FROM promo_chats WHERE is_bot = false ORDER BY is_active DESC, posts_sent DESC`
   );
   return rows;
 }
@@ -250,7 +250,7 @@ export async function sendPromoToChat(chatId: number, sender: PromoSender): Prom
 export async function runPromoCycle(sender: PromoSender): Promise<number> {
   const { rows } = await pool.query(
     `SELECT chat_id FROM promo_chats
-     WHERE is_active = true
+     WHERE is_active = true AND is_bot = false
        AND (last_post_at IS NULL OR last_post_at <= NOW() - (interval_minutes * INTERVAL '1 minute') + INTERVAL '30 seconds')
      ORDER BY last_post_at NULLS FIRST
      LIMIT 100`

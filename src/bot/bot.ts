@@ -786,7 +786,7 @@ bot.command("statistika", async (ctx) => {
       `👥 Jami o'yinchi: ${s.users}\n🆕 Bugun yangi: ${s.new_today}\n🔥 Bugun faol: ${s.active_today}\n📅 7 kunda faol: ${s.active_7d}\n` +
       `🔁 Kechagilarning bugun qaytgani: ${s.retention_d1 === null ? "—" : Math.round(s.retention_d1 * 100) + "%"} (${s.retention_cohort} kishidan)\n\n` +
       `🪙 Tokenlar: ${s.tokens}\n📈 Bugun savdo: ${s.trades_today} ta (${s.volume_today.toFixed(2)} Nex)\n` +
-      `📢 Reklama chatlari: ${s.promo_chats}\n⭐ Jami Stars: ${s.stars_total}\n🚫 Botni bloklagan: ${s.blocked_bot}`
+      `🤖 Bot-o'yinchilar: ${s.bots} (statistikaga kirmaydi)\n📢 Reklama chatlari: ${s.promo_chats}\n⭐ Jami Stars: ${s.stars_total}\n🚫 Botni bloklagan: ${s.blocked_bot}`
   );
 });
 
@@ -887,7 +887,7 @@ bot.command("stats", async (ctx) => {
   const stats = await getPlatformStats();
   await ctx.reply(
     `📊 Platforma statistikasi\n\n` +
-      `👥 Foydalanuvchilar: ${stats.total_users}\n` +
+      `👥 Foydalanuvchilar: ${stats.total_users}${Number(stats.bot_users) ? ` (+ ${stats.bot_users} ta 🤖 bot-o'yinchi)` : ""}\n` +
       `🪙 Yaratilgan tokenlar: ${stats.total_tokens}\n` +
       `💰 Muomaladagi Nex Trade: ${Number(stats.total_nex_trade_circulating).toFixed(2)}\n` +
       `🔁 Jami savdolar: ${stats.total_trades}\n` +

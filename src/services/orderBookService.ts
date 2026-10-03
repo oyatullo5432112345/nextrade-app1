@@ -700,8 +700,9 @@ export async function getOrderBook(tokenId: number, depth = 12) {
 /** Savdo lentasi: oxirgi kelishuvlar (har biri bir marta). */
 export async function getTradeTape(tokenId: number, limit = 30) {
   const { rows } = await pool.query(
-    `SELECT type AS side, amount, price, total_cost, created_at FROM transactions
-     WHERE token_id = $1 AND tape = true ORDER BY id DESC LIMIT $2`,
+    `SELECT t.type AS side, t.amount, t.price, t.total_cost, t.created_at, COALESCE(u.is_bot, false) AS bot
+     FROM transactions t LEFT JOIN users u ON u.id = t.user_id
+     WHERE t.token_id = $1 AND t.tape = true ORDER BY t.id DESC LIMIT $2`,
     [tokenId, Math.min(Math.max(limit, 1), 100)]
   );
   return rows;

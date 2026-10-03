@@ -43,6 +43,16 @@ ataladigan asosiy virtual token orqali amalga oshiriladi.
   himoya narxi; portfel bo'yicha "foydani oling" maslahati; tavsiyalar aniqligi 24 soatdan keyin
   o'lchanadi. Botda /ai buyrug'i. Tashqi API va pul talab qilmaydi.
 
+## v15: 🤖 bot-o'yinchilar
+- 150 ta ochiq belgilangan bot-o'yinchi (nomi "🤖" bilan), 6 ta bot-klan, 4 ta bot-guruh - reyting, klan va guruhlar ligasi jonli ko'rinadi.
+- Botlar haqiqiy savdo qiladi: bot bo'lmagan sotuvchilardan oladi, sotuvni kitobga qo'yadi (uni faqat haqiqiy o'yinchi oladi). Bot-bot savdo, MM yoki kafolat devoriga sotish yo'q.
+- Botlar hech qanday mukofot olmaydi; reytingda "bot" belgisi, lentada 🤖. Statistikada haqiqiy o'yinchilar alohida sanaladi.
+- Limitlar: 24 soatda jami 8000 Nex, bitta tokenga 250 Nex; token kamida 3 soatlik va 2 haqiqiy egali bo'lishi kerak.
+
+## v14: hamma tokenlar 1 000 000 gacha
+- Yangi token: **100 000 dan 1 000 000 gacha** (tugmalar: 100 000 / 250 000 / 500 000 / 1 000 000).
+- Eski tokenlar server ishga tushganda **1 000 000 ga** ko'tariladi: egalar tokeni va narx o'zgarmaydi, qo'shimcha tokenlar joriy narxdan boshlanadigan IPO zinapoyasiga qo'yiladi. Kafolat devori tegilmaydi; TON/NOT tegilmaydi.
+
 ## v13: token yaratish, guruhda belgilash, zaxira
 - Token miqdori **10 dan 1 000 000 gacha** (tugmalar: 1 000 / 10 000 / 100 000 / 1 000 000). Egalik chegarasi: oddiy egasi **20%**, yaratuvchi **30%**.
 - Yaratish ekranida "Tokeningiz qisqacha" kartasi: narx, bozor qiymati, kim qancha ega bo'la oladi.

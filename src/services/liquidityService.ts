@@ -146,7 +146,8 @@ export async function refreshLiquidity() {
      WHERE t.is_real = false AND t.is_hidden = false
        AND (t.listed_at IS NULL OR t.listed_at <= NOW())
        AND t.created_at <= NOW() - make_interval(secs => $1::float8 * 3600)
-       AND (SELECT COUNT(*) FROM holdings h WHERE h.token_id = t.id AND h.amount > 0) >= $2
+       AND (SELECT COUNT(*) FROM holdings h JOIN users hu ON hu.id = h.user_id
+            WHERE h.token_id = t.id AND h.amount > 0 AND hu.is_bot = false) >= $2
      ORDER BY t.id`,
     [cfg.minAgeHours, cfg.minHolders]
   );

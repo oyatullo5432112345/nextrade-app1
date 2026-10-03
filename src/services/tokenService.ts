@@ -1,11 +1,12 @@
 import { pool } from "../db/pool";
-import { generateInitialPrice } from "./pricingService";
+import { generateInitialPrice, genesisLadder, round4 } from "./pricingService";
 import { seedGenesisCore, placeOrderCore, inTransaction, Queryable } from "./orderBookService";
 import { recordBalanceSnapshot } from "./balanceHistoryService";
 
 const DEFAULT_CURVE_K = 1.5;
 export const MAX_SUPPLY_LIMIT = 1_000_000;
-export const MIN_SUPPLY_LIMIT = 10;
+// v14: yangi tokenlar 100 000 dan 1 000 000 gacha
+export const MIN_SUPPLY_LIMIT = Math.max(1, Number(process.env.TOKEN_MIN_SUPPLY ?? 100_000));
 // Kuniga butun platformada nechta yangi token yaratilishi mumkin (0 - cheklovsiz).
 // Guruh reklamasidagi "bugungi joylar" shu haqiqiy son bilan ko'rsatiladi.
 export const dailySlotsTotal = () => Math.max(0, Math.floor(Number(process.env.TOKEN_DAILY_SLOTS ?? 25) || 0));
@@ -396,3 +397,57 @@ export function getProBadgeCost() {
   return PRO_BADGE_COST;
 }
 
+
+/**
+ * v14: ESKI TOKENLARNI 1 000 000 GA KO'TARISH (bir marta, server ishga tushganda).
+ * - Egalar qo'lidagi tokenlar va joriy narx O'ZGARMAYDI.
+ * - Sotilmagan eski IPO buyurtmalari yopilib, qolgan hamma miqdor (eski qoldiq + yangi)
+ *   joriy narxdan boshlanib asta qimmatlashadigan bitta yangi IPO zinapoyasiga qo'yiladi.
+ * - Kafolat devori (backing) tegilmaydi. Yashirilgan va real (TON/NOT) tokenlar o'tkazib yuboriladi.
+ */
+export const SUPPLY_UPGRADE_TARGET = 1_000_000;
+
+export async function upgradeTokenSupply(tokenId: number, target = SUPPLY_UPGRADE_TARGET) {
+  return inTransaction(async (client) => {
+    const t = (await client.query("SELECT * FROM tokens WHERE id = $1 FOR UPDATE", [tokenId])).rows[0];
+    if (!t || t.is_real || t.is_hidden || Number(t.max_supply) >= target) return { result: false, after: () => {} };
+    await client.query(
+      "UPDATE orders SET status = 'cancelled', updated_at = NOW() WHERE token_id = $1 AND kind = 'genesis' AND status = 'open'",
+      [tokenId]
+    );
+    await client.query("UPDATE tokens SET max_supply = $1 WHERE id = $2", [target, tokenId]);
+    // Boshqa platforma SOTUV buyurtmalari (likvidlik) uchun joy qoldiramiz
+    const sells = await client.query(
+      "SELECT COALESCE(SUM(amount - filled), 0) AS n FROM orders WHERE token_id = $1 AND user_id IS NULL AND side = 'sell' AND status = 'open'",
+      [tokenId]
+    );
+    const circ = Number(t.circulating_supply);
+    const remaining = round4(target - circ - Number(sells.rows[0].n));
+    const ladder = genesisLadder(Number(t.current_price) || Number(t.base_price), circ, target, remaining, Number(t.curve_k) || 1.5);
+    for (const l of ladder) {
+      await client.query(
+        "INSERT INTO orders (user_id, token_id, side, type, price, amount, kind) VALUES (NULL, $1, 'sell', 'limit', $2, $3, 'genesis')",
+        [tokenId, l.price, l.amount]
+      );
+    }
+    await client.query("UPDATE tokens SET genesis_seeded = true WHERE id = $1", [tokenId]);
+    return { result: true, after: () => {} };
+  });
+}
+
+export async function upgradeAllTokenSupplies(target = SUPPLY_UPGRADE_TARGET) {
+  const { rows } = await pool.query(
+    "SELECT id FROM tokens WHERE is_real = false AND is_hidden = false AND max_supply < $1 ORDER BY id",
+    [target]
+  );
+  let n = 0;
+  for (const r of rows) {
+    try {
+      if (await upgradeTokenSupply(Number(r.id), target)) n++;
+    } catch (err) {
+      console.error(`❌ Token #${r.id} miqdorini ko'tarishda xato:`, err);
+    }
+  }
+  if (n) console.log(`🪙 ${n} ta eski token ${target.toLocaleString("en-US")} ga ko'tarildi`);
+  return n;
+}

@@ -11,6 +11,7 @@ import { ensureRealTokens, refreshRealTokens } from "./services/realTokenService
 import { processPredictions, payoutPreviousTournament, checkRealSignals } from "./services/gamesService";
 import { recordAndCheckPicks } from "./services/nexAiService";
 import { refreshLiquidity } from "./services/liquidityService";
+import { ensureBotPlayers, runBotPlayers } from "./services/botPlayersService";
 
 /**
  * FON VAZIFALARI (v8)
@@ -154,6 +155,17 @@ export function startJobs() {
   };
   setTimeout(mmJob, 20_000);
   setInterval(mmJob, 60_000);
+  // 🤖 Bot-o'yinchilar (ochiq belgilangan) - har 40 soniyada bir nechtasi savdo qiladi
+  let botRunning = false;
+  const botJob = async () => {
+    if (botRunning) return;
+    botRunning = true;
+    try { await runBotPlayers(); } catch (err) { console.error("❌ Bot-o'yinchilar xatosi:", err); }
+    botRunning = false;
+  };
+  ensureBotPlayers().catch((err) => console.error("❌ Bot-o'yinchilarni yaratishda xato:", err));
+  setTimeout(botJob, 45_000);
+  setInterval(botJob, 40_000);
   // Narx signallari - har 5 daqiqada
   setInterval(() => { checkRealSignals(sendTelegramMessage).catch((err) => console.error("❌ Signal xatosi:", err)); }, 5 * 60_000);
   // Render bepul tarifi 15 daqiqa so'rov bo'lmasa serverni uxlatadi - o'zimizni har 10 daqiqada "uyg'otib" turamiz

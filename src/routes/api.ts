@@ -40,6 +40,7 @@ import {
   MIN_SUPPLY_LIMIT, MAX_SUPPLY_LIMIT, getDailySlots,
 } from "../services/tokenService";
 import { listRealTokens } from "../services/realTokenService";
+import { getPlayerCounts } from "../services/botPlayersService";
 import {
   placePrediction, listPredictions, getTournament, joinTournament, tournamentTrade, setSignals, getFriendsLeague,
 } from "../services/gamesService";
@@ -158,7 +159,7 @@ apiRouter.get("/tokens/:id/image", ah(async (req, res) => {
 // Yaratishdan oldin: kafolat bilan boshlang'ich narx qancha bo'ladi
 apiRouter.get("/token-create-preview", (req, res) => {
   const symbol = typeof req.query.symbol === "string" ? req.query.symbol.slice(0, 16) : "X";
-  const supply = Math.min(Math.max(Number(req.query.supply) || 10000, MIN_SUPPLY_LIMIT), MAX_SUPPLY_LIMIT);
+  const supply = Math.min(Math.max(Number(req.query.supply) || MAX_SUPPLY_LIMIT, MIN_SUPPLY_LIMIT), MAX_SUPPLY_LIMIT);
   const backing = Math.min(Math.max(Number(req.query.backing) || 0, 0), MAX_BACKING_NEX);
   res.json({ ...backingPreview(symbol, supply, backing), fee: TOKEN_CREATE_FEE, backing, supply });
 });
@@ -683,7 +684,7 @@ apiRouter.post("/clans/leave", ahUser(async (req, res) => {
 
 // ---------- Haftalik liga ----------
 apiRouter.get("/league", ah(async (req, res) => {
-  res.json(await getLeague(uid(req)));
+  res.json({ ...(await getLeague(uid(req))), players: await getPlayerCounts() });
 }));
 
 // ---------- YANGI: Nex Tradex to'ldirish / chiqarish ----------

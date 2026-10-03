@@ -18,7 +18,7 @@ function weekStartSql(offset: number) {
 
 /** Foydalanuvchini guruh jamoasiga qo'shadi (faqat bot turgan guruhlar). */
 export async function setUserGroup(telegramId: number, chatId: number): Promise<string | null> {
-  const chat = await pool.query("SELECT title FROM promo_chats WHERE chat_id = $1", [chatId]);
+  const chat = await pool.query("SELECT title FROM promo_chats WHERE chat_id = $1 AND is_bot = false", [chatId]);
   if (!chat.rows[0]) return null;
   const upd = await pool.query("UPDATE users SET group_chat_id = $1 WHERE telegram_id = $2 RETURNING id", [chatId, telegramId]);
   if (!upd.rows[0]) return null;
@@ -27,20 +27,20 @@ export async function setUserGroup(telegramId: number, chatId: number): Promise<
 
 export async function getGroupLeague(limit = 10) {
   const { rows } = await pool.query(
-    `SELECT pc.chat_id, pc.title,
+    `SELECT pc.chat_id, pc.title, pc.is_bot,
             COUNT(DISTINCT u.id)::int AS members,
             COALESCE(SUM(t.realized_pnl) FILTER (
               WHERE t.type = 'sell' AND t.created_at >= ${weekStartSql(0)}
             ), 0) AS pnl
      FROM promo_chats pc
-     JOIN users u ON u.group_chat_id = pc.chat_id AND u.telegram_id > 0
+     JOIN users u ON u.group_chat_id = pc.chat_id AND (u.telegram_id > 0 OR u.is_bot = true)
      LEFT JOIN transactions t ON t.user_id = u.id AND t.created_at >= ${weekStartSql(0)}
-     GROUP BY pc.chat_id, pc.title
+     GROUP BY pc.chat_id, pc.title, pc.is_bot
      ORDER BY pnl DESC, members DESC
      LIMIT $1`,
     [limit]
   );
-  return rows.map((r, i) => ({ rank: i + 1, chatId: Number(r.chat_id), title: r.title, members: r.members, pnl: Number(r.pnl) }));
+  return rows.map((r, i) => ({ rank: i + 1, chatId: Number(r.chat_id), title: r.title, isBot: Boolean(r.is_bot), members: r.members, pnl: Number(r.pnl) }));
 }
 
 // ---------------- 2) Giveaway ----------------
@@ -205,15 +205,15 @@ export async function getMyClan(userId: number) {
 
 export async function getClanLeague(limit = 10) {
   const { rows } = await pool.query(
-    `SELECT c.id, c.name, c.tag, COUNT(DISTINCT u.id)::int AS members,
+    `SELECT c.id, c.name, c.tag, (SELECT o.is_bot FROM users o WHERE o.id = c.owner_id) AS is_bot, COUNT(DISTINCT u.id)::int AS members,
             COALESCE(SUM(t.realized_pnl) FILTER (WHERE t.type = 'sell' AND t.created_at >= ${weekStartSql(0)}), 0) AS pnl
      FROM clans c
      JOIN users u ON u.clan_id = c.id
      LEFT JOIN transactions t ON t.user_id = u.id AND t.created_at >= ${weekStartSql(0)}
-     GROUP BY c.id, c.name, c.tag
+     GROUP BY c.id, c.name, c.tag, c.owner_id
      ORDER BY pnl DESC, members DESC
      LIMIT $1`,
     [limit]
   );
-  return rows.map((r, i) => ({ rank: i + 1, name: r.name, tag: r.tag, members: r.members, pnl: Number(r.pnl) }));
+  return rows.map((r, i) => ({ rank: i + 1, name: r.name, tag: r.tag, isBot: Boolean(r.is_bot), members: r.members, pnl: Number(r.pnl) }));
 }

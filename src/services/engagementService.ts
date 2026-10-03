@@ -230,23 +230,25 @@ function weekStartSql(offsetWeeks: number) {
   return `((date_trunc('week', NOW() AT TIME ZONE '${TZ}') + INTERVAL '${offsetWeeks} week') AT TIME ZONE '${TZ}')::timestamp`;
 }
 
-async function leagueTop(fromSql: string, toSql: string, limit: number, runner: { query: PoolClient["query"] } = pool) {
+// includeBots: reytingda ko'rsatish uchun (🤖); mukofot to'lashda doim false - botlar mukofot olmaydi
+async function leagueTop(fromSql: string, toSql: string, limit: number, runner: { query: PoolClient["query"] } = pool, includeBots = false) {
   const { rows } = await runner.query(
-    `SELECT u.id AS user_id, u.username, SUM(t.realized_pnl) AS pnl, COUNT(*)::int AS sells
+    `SELECT u.id AS user_id, u.username, u.is_bot, SUM(t.realized_pnl) AS pnl, COUNT(*)::int AS sells
      FROM transactions t JOIN users u ON u.id = t.user_id
      WHERE t.type = 'sell' AND t.realized_pnl IS NOT NULL
        AND t.created_at >= ${fromSql} AND t.created_at < ${toSql}
-       AND u.telegram_id > 0
-     GROUP BY u.id, u.username
+       AND (u.telegram_id > 0 OR ($4::boolean AND u.is_bot = true))
+     GROUP BY u.id, u.username, u.is_bot
      HAVING SUM(t.realized_pnl) >= $2 AND COUNT(*) >= $3
      ORDER BY pnl DESC
      LIMIT $1`,
-    [limit, Math.max(LEAGUE_MIN_PNL, 0.0001), LEAGUE_MIN_SELLS]
+    [limit, Math.max(LEAGUE_MIN_PNL, 0.0001), LEAGUE_MIN_SELLS, includeBots]
   );
   return rows.map((r, i) => ({
     rank: i + 1,
     userId: Number(r.user_id),
     username: r.username,
+    isBot: Boolean(r.is_bot),
     pnl: Number(r.pnl),
     sells: r.sells,
     prize: LEAGUE_PRIZES[i] ?? 0,
@@ -254,7 +256,10 @@ async function leagueTop(fromSql: string, toSql: string, limit: number, runner: 
 }
 
 export async function getLeague(userId: number) {
-  const top = await leagueTop(weekStartSql(0), weekStartSql(1), 10);
+  const top0 = await leagueTop(weekStartSql(0), weekStartSql(1), 10, pool, true);
+  // Mukofot faqat haqiqiy o'yinchilarga: 🤖 bot o'rin egallasa ham mukofot keyingi haqiqiy o'yinchiga o'tadi
+  let realIdx = 0;
+  const top = top0.map((t) => ({ ...t, prize: t.isBot ? 0 : (LEAGUE_PRIZES[realIdx++] ?? 0) }));
   const [endsRes, meRes, lastRes] = await Promise.all([
     pool.query(`SELECT (${weekStartSql(1)})::timestamptz AS ends_at`),
     pool.query(

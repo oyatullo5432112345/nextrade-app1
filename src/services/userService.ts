@@ -178,10 +178,10 @@ export async function getReferralCount(userId: number): Promise<number> {
 export async function getUserLeaderboard(limit = 10) {
   const result = await pool.query(
     // Xarid buyurtmalarida muzlatilgan Nex ham foydalanuvchiniki - hisobga olinadi
-    `SELECT id, username, nex_trade_balance + COALESCE(
+    `SELECT id, username, is_bot, nex_trade_balance + COALESCE(
               (SELECT SUM(locked_nex) FROM orders o WHERE o.user_id = users.id AND o.status = 'open'), 0) AS nex_trade_balance
      FROM users
-     WHERE telegram_id > 0
+     WHERE (telegram_id > 0 OR is_bot = true) AND is_banned = false
      ORDER BY 3 DESC
      LIMIT $1`,
     [limit]
@@ -192,7 +192,8 @@ export async function getUserLeaderboard(limit = 10) {
 export async function getPlatformStats() {
   const result = await pool.query(`
     SELECT
-      (SELECT COUNT(*)::int FROM users) AS total_users,
+      (SELECT COUNT(*)::int FROM users WHERE telegram_id > 0) AS total_users,
+      (SELECT COUNT(*)::int FROM users WHERE is_bot = true) AS bot_users,
       (SELECT COUNT(*)::int FROM tokens) AS total_tokens,
       (SELECT COALESCE(SUM(nex_trade_balance), 0) FROM users) AS total_nex_trade_circulating,
       (SELECT COUNT(*)::int FROM transactions WHERE tape = true) AS total_trades,
